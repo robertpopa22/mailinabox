@@ -94,6 +94,27 @@ EOF
 
 cat > /etc/rspamd/local.d/milter_headers.conf << 'EOF'
 use = ["x-spamd-bar", "x-spam-status", "authentication-results"];
+skip_local = false;
+skip_authenticated = true;
+
+routines {
+  x-spam-status {
+    header = "X-Spam-Status";
+    remove = 1;
+  }
+  x-spamd-bar {
+    header = "X-Spamd-Bar";
+    positive = "+";
+    negative = "-";
+    neutral = "/";
+    remove = 1;
+  }
+  authentication-results {
+    header = "Authentication-Results";
+    remove = 0;
+    add_smtp_user = false;
+  }
+}
 EOF
 
 # === DKIM SIGNING ===
@@ -182,6 +203,19 @@ plugin {
 EOF
 
 mkdir -p /etc/dovecot/sieve
+# Sieve directory must be writable by the mail user so Dovecot can
+# compile and cache .svbin binaries at runtime.
+chown mail:dovecot /etc/dovecot/sieve
+chmod 775 /etc/dovecot/sieve
+
+# Dovecot's systemd unit uses ProtectSystem=full which mounts /etc read-only.
+# We need an override to allow writing compiled sieve binaries.
+mkdir -p /etc/systemd/system/dovecot.service.d
+cat > /etc/systemd/system/dovecot.service.d/sieve-write.conf << 'EOF'
+[Service]
+ReadWritePaths=/etc/dovecot/sieve
+EOF
+systemctl daemon-reload
 
 cat > /etc/dovecot/sieve/learn-spam.sieve << 'EOF'
 require ["vnd.dovecot.pipe", "copy", "imapsieve", "environment", "variables"];
@@ -218,6 +252,8 @@ rm -f /etc/dovecot/conf.d/99-local-spampd.conf
 
 systemctl stop spampd 2>/dev/null
 systemctl disable spampd 2>/dev/null
+systemctl stop spamassassin 2>/dev/null
+systemctl disable spamassassin 2>/dev/null
 
 # === INITIAL BAYES TRAINING ===
 # Seed the Bayes classifier from existing mailboxes (ham from cur/, spam from .Spam/cur/)
