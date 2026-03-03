@@ -202,9 +202,9 @@ exec /usr/bin/rspamc learn_"$1"
 LEARNEOF
 chmod +x /etc/dovecot/sieve/rspamd-learn.sh
 
-# Compile sieve scripts
-sievec /etc/dovecot/sieve/learn-spam.sieve
-sievec /etc/dovecot/sieve/learn-ham.sieve
+# Sieve scripts are compiled automatically by Dovecot at runtime when
+# the sieve_extprograms and sieve_imapsieve plugins are loaded.
+# Manual sievec compilation fails because it doesn't load these plugins.
 
 # === REMOVE DEPRECATED DOVECOT ANTISPAM PLUGIN ===
 
