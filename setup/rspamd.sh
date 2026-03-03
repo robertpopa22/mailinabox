@@ -224,6 +224,13 @@ EOF
 
 cat > /etc/dovecot/sieve/learn-ham.sieve << 'EOF'
 require ["vnd.dovecot.pipe", "copy", "imapsieve", "environment", "variables"];
+
+# imap.mailbox = destination folder when moving FROM Spam.
+# Skip learn_ham when user deletes spam (moves Spam -> Trash).
+if environment :is "imap.mailbox" "Trash" {
+    stop;
+}
+
 pipe :copy "rspamd-learn.sh" ["ham"];
 EOF
 
