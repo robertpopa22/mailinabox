@@ -669,6 +669,31 @@ def privacy_status_set():
 	utils.write_settings(config, env)
 	return "OK"
 
+# EMAIL ARCHIVE
+
+@app.route('/system/archive', methods=["GET"])
+@authorized_personnel_only
+def archive_get():
+	config = utils.load_settings(env)
+	return json_response({
+		"archive_address": config.get("archive_address", ""),
+	})
+
+@app.route('/system/archive', methods=["POST"])
+@authorized_personnel_only
+def archive_set():
+	config = utils.load_settings(env)
+	address = request.form.get('archive_address', '').strip().lower()
+	if address:
+		config["archive_address"] = address
+	else:
+		config.pop("archive_address", None)
+	utils.write_settings(config, env)
+	return json_response({
+		"archive_address": config.get("archive_address", ""),
+		"note": "Run 'sudo mailinabox' to apply the change to Postfix.",
+	})
+
 # MUNIN
 
 @app.route('/munin/')

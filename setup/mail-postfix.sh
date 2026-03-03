@@ -303,6 +303,34 @@ chmod +x /etc/cron.daily/mailinabox-postgrey-whitelist
 tools/editconf.py /etc/postfix/main.cf \
 	message_size_limit=134217728
 
+# ### Email Archive (always_bcc)
+#
+# If archive_address is set in settings.yaml, configure Postfix to BCC
+# all outgoing and incoming email to that address. This is useful for
+# legal compliance (e.g., accounting firms, lawyers) or internal auditing.
+# The archive mailbox must be created as a regular mail user first.
+
+# Load archive_address from settings.yaml if available.
+ARCHIVE_ADDRESS=$(python3 -c "
+import sys, os
+sys.path.insert(0, os.path.join('$PWD', 'management'))
+from utils import load_settings, load_environment
+env = load_environment()
+settings = load_settings(env)
+addr = settings.get('archive_address', '')
+print(addr if addr else '')
+" 2>/dev/null)
+
+if [ -n "$ARCHIVE_ADDRESS" ]; then
+	tools/editconf.py /etc/postfix/main.cf \
+		"always_bcc=$ARCHIVE_ADDRESS"
+	echo "Email archive enabled: all mail will be BCC'd to $ARCHIVE_ADDRESS"
+else
+	# Remove always_bcc if it was previously set but archive_address was cleared.
+	tools/editconf.py /etc/postfix/main.cf -e \
+		always_bcc=
+fi
+
 # Allow the two SMTP ports in the firewall.
 
 ufw_allow smtp
