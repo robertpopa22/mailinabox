@@ -193,7 +193,12 @@ chmod 770 "$STORAGE_ROOT/mail/spamassassin"
 
 # Generate whitelist/blacklist rules from settings.yaml.
 # This allows admins to manage whitelists via the API (/admin/system/spam-whitelist).
-python3 << PYEOF
+# Use MiaB venv python (has rtyaml for YAML parsing).
+MIAB_PYTHON="/usr/local/lib/mailinabox/env/bin/python3"
+if [ ! -x "$MIAB_PYTHON" ]; then
+	MIAB_PYTHON="python3"
+fi
+$MIAB_PYTHON << PYEOF
 import sys, os
 sys.path.insert(0, os.path.join('$PWD', 'management'))
 from utils import load_settings, load_environment
