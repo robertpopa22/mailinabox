@@ -669,6 +669,32 @@ def privacy_status_set():
 	utils.write_settings(config, env)
 	return "OK"
 
+# NAT MODE
+
+@app.route('/system/nat-mode', methods=["GET"])
+@authorized_personnel_only
+def nat_mode_get():
+	config = utils.load_settings(env)
+	auto_detected = env.get('PRIVATE_IP') and env['PUBLIC_IP'] != env.get('PRIVATE_IP')
+	return json_response({
+		"nat_mode": config.get("nat_mode"),
+		"auto_detected": auto_detected,
+		"public_ip": env.get('PUBLIC_IP'),
+		"private_ip": env.get('PRIVATE_IP'),
+	})
+
+@app.route('/system/nat-mode', methods=["POST"])
+@authorized_personnel_only
+def nat_mode_set():
+	config = utils.load_settings(env)
+	value = request.form.get('value', 'auto')
+	if value == 'auto':
+		config.pop("nat_mode", None)
+	else:
+		config["nat_mode"] = (value == "true")
+	utils.write_settings(config, env)
+	return "OK"
+
 # MUNIN
 
 @app.route('/munin/')
