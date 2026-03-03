@@ -35,6 +35,18 @@ def is_external_dns_domain(domain, env):
 			return True
 	return False
 
+def is_behind_nat(env):
+	"""Detect if box is behind NAT (PUBLIC_IP differs from PRIVATE_IP).
+
+	MiaB stores both PUBLIC_IP and PRIVATE_IP in /etc/mailinabox.conf.
+	When they differ, the box is behind NAT (e.g., 1:1 NAT via a router).
+	This can also be explicitly set via nat_mode in settings.yaml.
+	"""
+	settings = load_settings(env)
+	if settings.get('nat_mode') is not None:
+		return settings.get('nat_mode', False)
+	return env.get('PRIVATE_IP') and env['PUBLIC_IP'] != env.get('PRIVATE_IP')
+
 def get_services():
 	return [
 		{ "name": "Local DNS (bind9)", "port": 53, "public": False, },
@@ -111,6 +123,7 @@ def check_service(i, service, env):
 	output = BufferedOutput()
 	running = False
 	fatal = False
+	nat = is_behind_nat(env)
 
 	# Helper function to make a connection to the service, since we try
 	# up to three ways (localhost, IPv4 address, IPv6 address).
@@ -129,24 +142,35 @@ def check_service(i, service, env):
 			s.close()
 
 	if service["public"]:
-		# Service should be publicly accessible.
-		if try_connect(env["PUBLIC_IP"]):
-			# IPv4 ok.
-			if not env.get("PUBLIC_IPV6") or service.get("ipv6") is False or try_connect(env["PUBLIC_IPV6"]):
-				# No IPv6, or service isn't meant to run on IPv6, or IPv6 is good.
+		# When behind NAT, we can't connect to PUBLIC_IP from the box itself.
+		# Test on the PRIVATE_IP (or 127.0.0.1 for DNS) instead.
+		if nat:
+			test_ip = env.get("PRIVATE_IP", "127.0.0.1")
+			if try_connect(test_ip):
 				running = True
-
-			# IPv4 ok but IPv6 failed. Try the PRIVATE_IPV6 address to see if the service is bound to the interface.
-			elif service["port"] != 53 and try_connect(env["PRIVATE_IPV6"]):
-				output.print_error("%s is running (and available over IPv4 and the local IPv6 address), but it is not publicly accessible at %s:%d." % (service['name'], env['PUBLIC_IPV6'], service['port']))
+			elif service["port"] != 53 and try_connect("127.0.0.1"):
+				output.print_error("%s is running on localhost but not bound to %s:%d." % (service['name'], test_ip, service['port']))
 			else:
-				output.print_error("%s is running and available over IPv4 but is not accessible over IPv6 at %s port %d." % (service['name'], env['PUBLIC_IPV6'], service['port']))
-
-		# IPv4 failed. Try the private IP to see if the service is running but not accessible (except DNS because a different service runs on the private IP).
-		elif service["port"] != 53 and try_connect("127.0.0.1"):
-			output.print_error("%s is running but is not publicly accessible at %s:%d." % (service['name'], env['PUBLIC_IP'], service['port']))
+				output.print_error("%s is not running (port %d)." % (service['name'], service['port']))
 		else:
-			output.print_error("%s is not running (port %d)." % (service['name'], service['port']))
+			# Service should be publicly accessible.
+			if try_connect(env["PUBLIC_IP"]):
+				# IPv4 ok.
+				if not env.get("PUBLIC_IPV6") or service.get("ipv6") is False or try_connect(env["PUBLIC_IPV6"]):
+					# No IPv6, or service isn't meant to run on IPv6, or IPv6 is good.
+					running = True
+
+				# IPv4 ok but IPv6 failed. Try the PRIVATE_IPV6 address to see if the service is bound to the interface.
+				elif service["port"] != 53 and try_connect(env["PRIVATE_IPV6"]):
+					output.print_error("%s is running (and available over IPv4 and the local IPv6 address), but it is not publicly accessible at %s:%d." % (service['name'], env['PUBLIC_IPV6'], service['port']))
+				else:
+					output.print_error("%s is running and available over IPv4 but is not accessible over IPv6 at %s port %d." % (service['name'], env['PUBLIC_IPV6'], service['port']))
+
+			# IPv4 failed. Try the private IP to see if the service is running but not accessible (except DNS because a different service runs on the private IP).
+			elif service["port"] != 53 and try_connect("127.0.0.1"):
+				output.print_error("%s is running but is not publicly accessible at %s:%d." % (service['name'], env['PUBLIC_IP'], service['port']))
+			else:
+				output.print_error("%s is not running (port %d)." % (service['name'], service['port']))
 
 		# Why is nginx not running?
 		if not running and service["port"] in {80, 443}:
@@ -819,7 +843,32 @@ def check_mail_domain(domain, env, output):
 			else:
 				output.print_error(f"MTA-STS policy is present but has unexpected settings. [{policy[1]}]")
 		else:
-			output.print_error(f"MTA-STS policy is missing: {valid}")
+			# When behind NAT, the standard fetch may fail because the resolver
+			# tries to connect to PUBLIC_IP which isn't reachable from localhost
+			# without hairpin NAT. Try fetching directly from localhost.
+			if is_behind_nat(env):
+				try:
+					import urllib.request, ssl
+					ctx = ssl.create_default_context()
+					ctx.check_hostname = False
+					ctx.verify_mode = ssl.CERT_NONE
+					req = urllib.request.Request(
+						f"https://127.0.0.1/.well-known/mta-sts.txt",
+						headers={"Host": f"mta-sts.{domain}"}
+					)
+					with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
+						sts_text = resp.read().decode()
+					# Parse the policy manually.
+					sts_lines = dict(line.split(":", 1) for line in sts_text.strip().splitlines() if ":" in line)
+					sts_lines = {k.strip(): v.strip() for k, v in sts_lines.items()}
+					if sts_lines.get("mx") == env['PRIMARY_HOSTNAME'] and sts_lines.get("mode") == "enforce":
+						output.print_ok("MTA-STS policy is present. (Verified via localhost due to NAT.)")
+					else:
+						output.print_error(f"MTA-STS policy is present but has unexpected settings. [{sts_lines}]")
+				except Exception:
+					output.print_warning(f"MTA-STS policy could not be verified (NAT detected, local fetch failed: {valid}). Verify from an external host.")
+			else:
+				output.print_error(f"MTA-STS policy is missing: {valid}")
 
 	else:
 		output.print_error(f"""This domain's DNS MX record is incorrect. It is currently set to '{mx}' but should be '{recommended_mx}'. Mail will not
