@@ -205,13 +205,41 @@ tools/editconf.py /etc/postfix/main.cf \
 
 # ### Incoming Mail
 
-# Pass mail to spampd, which acts as the local delivery agent (LDA),
-# which then passes the mail over to the Dovecot LMTP server after.
-# spampd runs on port 10025 by default.
+# Pass mail to the spam filter before delivery to Dovecot.
+#
+# With SpamAssassin (default): mail goes through spampd (LMTP proxy on port 10025)
+#   Postfix:25 → spampd:10025 → SA scan → Dovecot:10026
+#
+# With rspamd: mail goes directly to Dovecot, rspamd scans via milter protocol
+#   Postfix:25 → rspamd milter:11332 → scan → Postfix → Dovecot:10026
 #
 # In a basic setup we would pass mail directly to Dovecot by setting
 # virtual_transport to `lmtp:unix:private/dovecot-lmtp`.
-tools/editconf.py /etc/postfix/main.cf "virtual_transport=lmtp:[127.0.0.1]:10025"
+
+# Read spam filter setting
+SPAM_FILTER=$(python3 -c "
+import sys, os
+sys.path.insert(0, os.path.join('$PWD', 'management'))
+from utils import load_settings, load_environment
+env = load_environment()
+settings = load_settings(env)
+print(settings.get('spam_filter', 'spamassassin'))
+" 2>/dev/null || echo "spamassassin")
+
+if [ "$SPAM_FILTER" = "rspamd" ]; then
+	# rspamd: mail goes directly to Dovecot, rspamd scans via milter
+	# OpenDKIM (8891) and OpenDMARC (8893) remain as separate milters
+	tools/editconf.py /etc/postfix/main.cf \
+		"virtual_transport=lmtp:[127.0.0.1]:10026" \
+		"smtpd_milters=inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893" \
+		"non_smtpd_milters=inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893" \
+		milter_default_action=accept \
+		milter_protocol=6
+else
+	# SpamAssassin: mail goes through spampd proxy
+	tools/editconf.py /etc/postfix/main.cf \
+		"virtual_transport=lmtp:[127.0.0.1]:10025"
+fi
 # Clear the lmtp_destination_recipient_limit setting which in previous
 # versions of Mail-in-a-Box was set to 1 because of a spampd bug.
 # See https://github.com/mail-in-a-box/mailinabox/issues/1523.

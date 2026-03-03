@@ -669,6 +669,32 @@ def privacy_status_set():
 	utils.write_settings(config, env)
 	return "OK"
 
+# SPAM FILTER
+
+@app.route('/system/spam-filter', methods=["GET"])
+@authorized_personnel_only
+def spam_filter_get():
+	settings = utils.load_settings(env)
+	return json_response({
+		"filter": settings.get("spam_filter", "spamassassin"),
+		"options": ["spamassassin", "rspamd"],
+	})
+
+@app.route('/system/spam-filter', methods=["POST"])
+@authorized_personnel_only
+def spam_filter_set():
+	value = request.form.get('filter', 'spamassassin')
+	if value not in ('spamassassin', 'rspamd'):
+		return ("Invalid filter. Must be 'spamassassin' or 'rspamd'.", 400)
+	settings = utils.load_settings(env)
+	settings['spam_filter'] = value
+	utils.write_settings(settings, env)
+	return json_response({
+		"status": "ok",
+		"filter": value,
+		"note": "Run 'sudo mailinabox' to apply. This will restart mail services.",
+	})
+
 # MUNIN
 
 @app.route('/munin/')

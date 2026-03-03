@@ -12,6 +12,23 @@
 source /etc/mailinabox.conf # get global vars
 source setup/functions.sh # load our functions
 
+# Check which spam filter is configured. Default is spamassassin (backward compatible).
+SPAM_FILTER=$(python3 -c "
+import sys, os
+sys.path.insert(0, os.path.join('$PWD', 'management'))
+from utils import load_settings, load_environment
+env = load_environment()
+settings = load_settings(env)
+print(settings.get('spam_filter', 'spamassassin'))
+" 2>/dev/null || echo "spamassassin")
+
+if [ "$SPAM_FILTER" = "rspamd" ]; then
+	source setup/rspamd.sh
+	exit 0
+fi
+
+# === SpamAssassin setup (default) ===
+
 # Install packages and basic configuration
 # ----------------------------------------
 
