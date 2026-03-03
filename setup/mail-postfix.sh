@@ -229,6 +229,11 @@ if [ "$SPAM_FILTER" = "rspamd" ]; then
 		"non_smtpd_milters=inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893" \
 		milter_default_action=accept \
 		milter_protocol=6
+
+	# Remove any content_filter=spamassassin from master.cf smtp service
+	# and remove the spamassassin pipe service (not needed with rspamd milter)
+	sed -i '/content_filter=spamassassin/d' /etc/postfix/master.cf
+	sed -i '/^spamassassin[[:space:]]*unix/,/^[a-z]/{/^spamassassin/d;/spamc/d}' /etc/postfix/master.cf
 else
 	# SpamAssassin: mail goes through spampd proxy
 	tools/editconf.py /etc/postfix/main.cf \
