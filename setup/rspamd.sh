@@ -16,6 +16,12 @@
 source setup/functions.sh
 source /etc/mailinabox.conf
 
+# Use MiaB venv python if available (has rtyaml), fallback to system python3
+MIAB_PYTHON="/usr/local/lib/mailinabox/env/bin/python3"
+if [ ! -x "$MIAB_PYTHON" ]; then
+	MIAB_PYTHON="python3"
+fi
+
 echo "Installing rspamd spam filter..."
 
 # === INSTALL PACKAGES ===
@@ -42,14 +48,8 @@ count = 4;
 EOF
 
 # Controller worker: Web UI + API on port 11334
-RSPAMD_PASSWORD=$(python3 -c "
-import sys, os
-sys.path.insert(0, os.path.join('$PWD', 'management'))
-from utils import load_settings, load_environment
-env = load_environment()
-settings = load_settings(env)
-print(settings.get('rspamd_password', ''))
-" 2>/dev/null)
+# Read rspamd_password from settings.yaml (simple grep, no Python needed)
+RSPAMD_PASSWORD=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^rspamd_password:" | awk '{print $2}')
 
 if [ -n "$RSPAMD_PASSWORD" ]; then
 	RSPAMD_PASSWORD_HASH=$(rspamadm pw -p "$RSPAMD_PASSWORD" 2>/dev/null)
@@ -126,7 +126,7 @@ BLACKLIST_FILE="/etc/rspamd/local.d/blacklist-domains.map"
 touch "$WHITELIST_FILE" "$BLACKLIST_FILE"
 
 # Generate whitelist/blacklist map files from settings.yaml
-python3 << PYEOF
+$MIAB_PYTHON << PYEOF
 import sys, os
 sys.path.insert(0, os.path.join('$PWD', 'management'))
 from utils import load_settings, load_environment

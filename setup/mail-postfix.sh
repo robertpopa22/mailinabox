@@ -216,15 +216,9 @@ tools/editconf.py /etc/postfix/main.cf \
 # In a basic setup we would pass mail directly to Dovecot by setting
 # virtual_transport to `lmtp:unix:private/dovecot-lmtp`.
 
-# Read spam filter setting
-SPAM_FILTER=$(python3 -c "
-import sys, os
-sys.path.insert(0, os.path.join('$PWD', 'management'))
-from utils import load_settings, load_environment
-env = load_environment()
-settings = load_settings(env)
-print(settings.get('spam_filter', 'spamassassin'))
-" 2>/dev/null || echo "spamassassin")
+# Read spam filter setting directly from settings.yaml (avoids venv dependency).
+SPAM_FILTER=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^spam_filter:" | awk '{print $2}')
+SPAM_FILTER=${SPAM_FILTER:-spamassassin}
 
 if [ "$SPAM_FILTER" = "rspamd" ]; then
 	# rspamd: mail goes directly to Dovecot, rspamd scans via milter
