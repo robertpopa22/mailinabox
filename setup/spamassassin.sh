@@ -19,7 +19,7 @@ SPAM_FILTER=${SPAM_FILTER:-spamassassin}
 
 if [ "$SPAM_FILTER" = "rspamd" ]; then
 	source setup/rspamd.sh
-	exit 0
+	return 0 2>/dev/null || exit 0
 fi
 
 # === SpamAssassin setup (default) ===
