@@ -669,6 +669,25 @@ def privacy_status_set():
 	utils.write_settings(config, env)
 	return "OK"
 
+# EXTERNAL DNS
+
+@app.route('/system/external-dns', methods=["GET"])
+@authorized_personnel_only
+def external_dns_get():
+	config = utils.load_settings(env)
+	return json_response(config.get("external_dns_domains", []))
+
+@app.route('/system/external-dns', methods=["POST"])
+@authorized_personnel_only
+def external_dns_set():
+	config = utils.load_settings(env)
+	# Accept a comma/newline-separated list of domains.
+	domains_raw = request.form.get('domains', '')
+	domains = [d.strip().lower() for d in re.split(r'[,\n]+', domains_raw) if d.strip()]
+	config["external_dns_domains"] = domains
+	utils.write_settings(config, env)
+	return json_response(domains)
+
 # MUNIN
 
 @app.route('/munin/')

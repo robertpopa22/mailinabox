@@ -21,6 +21,20 @@ from mailconfig import get_mail_domains, get_mail_aliases
 from utils import shell, sort_domains, load_env_vars_from_file, load_settings, get_ssh_port, get_ssh_config_value
 from backup import get_backup_config, backup_status
 
+def is_external_dns_domain(domain, env):
+	"""Check if domain uses external DNS (not managed by MiaB's nsd).
+
+	Returns True if the domain or its parent domain is listed in the
+	external_dns_domains setting. This is used to skip DNS checks that
+	are irrelevant when DNS is managed externally (e.g., by Cloudflare).
+	"""
+	settings = load_settings(env)
+	external_domains = settings.get('external_dns_domains', [])
+	for ext_domain in external_domains:
+		if domain == ext_domain or domain.endswith('.' + ext_domain):
+			return True
+	return False
+
 def get_services():
 	return [
 		{ "name": "Local DNS (bind9)", "port": 53, "public": False, },
@@ -454,35 +468,46 @@ def run_domain_checks_on_domain(domain, rounded_time, env, dns_domains, dns_zone
 	return (domain, output)
 
 def check_primary_hostname_dns(domain, env, output, dns_domains, dns_zonefiles):
+	# If this domain uses external DNS, skip glue/NS/DNSSEC/TLSA checks
+	# but still check that the domain resolves and reverse DNS is set.
+	external_dns = is_external_dns_domain(domain, env)
+
 	# If a DS record is set on the zone containing this domain, check DNSSEC now.
 	has_dnssec = False
-	for zone in dns_domains:
-		if (zone == domain or domain.endswith("." + zone)) and query_dns(zone, "DS", nxdomain=None) is not None:
-			has_dnssec = True
-			check_dnssec(zone, env, output, dns_zonefiles, is_checking_primary=True)
+	if not external_dns:
+		for zone in dns_domains:
+			if (zone == domain or domain.endswith("." + zone)) and query_dns(zone, "DS", nxdomain=None) is not None:
+				has_dnssec = True
+				check_dnssec(zone, env, output, dns_zonefiles, is_checking_primary=True)
+	else:
+		output.print_ok("Domain uses external DNS. DNSSEC checks skipped.")
 
 	ip = query_dns(domain, "A")
-	ns_ips = query_dns("ns1." + domain, "A") + '/' + query_dns("ns2." + domain, "A")
 	my_ips = env['PUBLIC_IP'] + ((" / "+env['PUBLIC_IPV6']) if env.get("PUBLIC_IPV6") else "")
 
-	# Check that the ns1/ns2 hostnames resolve to A records. This information probably
-	# comes from the TLD since the information is set at the registrar as glue records.
-	# We're probably not actually checking that here but instead checking that we, as
-	# the nameserver, are reporting the right info --- but if the glue is incorrect this
-	# will probably fail.
-	if ns_ips == env['PUBLIC_IP'] + '/' + env['PUBLIC_IP']:
-		output.print_ok("Nameserver glue records are correct at registrar. [ns1/ns2.{} ↦ {}]".format(env['PRIMARY_HOSTNAME'], env['PUBLIC_IP']))
+	if not external_dns:
+		ns_ips = query_dns("ns1." + domain, "A") + '/' + query_dns("ns2." + domain, "A")
 
-	elif ip == env['PUBLIC_IP']:
-		# The NS records are not what we expect, but the domain resolves correctly, so
-		# the user may have set up external DNS. List this discrepancy as a warning.
-		output.print_warning("""Nameserver glue records (ns1.{} and ns2.{}) should be configured at your domain name
-			registrar as having the IP address of this box ({}). They currently report addresses of {}. If you have set up External DNS, this may be OK.""".format(env['PRIMARY_HOSTNAME'], env['PRIMARY_HOSTNAME'], env['PUBLIC_IP'], ns_ips))
+		# Check that the ns1/ns2 hostnames resolve to A records. This information probably
+		# comes from the TLD since the information is set at the registrar as glue records.
+		# We're probably not actually checking that here but instead checking that we, as
+		# the nameserver, are reporting the right info --- but if the glue is incorrect this
+		# will probably fail.
+		if ns_ips == env['PUBLIC_IP'] + '/' + env['PUBLIC_IP']:
+			output.print_ok("Nameserver glue records are correct at registrar. [ns1/ns2.{} ↦ {}]".format(env['PRIMARY_HOSTNAME'], env['PUBLIC_IP']))
 
+		elif ip == env['PUBLIC_IP']:
+			# The NS records are not what we expect, but the domain resolves correctly, so
+			# the user may have set up external DNS. List this discrepancy as a warning.
+			output.print_warning("""Nameserver glue records (ns1.{} and ns2.{}) should be configured at your domain name
+				registrar as having the IP address of this box ({}). They currently report addresses of {}. If you have set up External DNS, this may be OK.""".format(env['PRIMARY_HOSTNAME'], env['PRIMARY_HOSTNAME'], env['PUBLIC_IP'], ns_ips))
+
+		else:
+			output.print_error("""Nameserver glue records are incorrect. The ns1.{} and ns2.{} nameservers must be configured at your domain name
+				registrar as having the IP address {}. They currently report addresses of {}. It may take several hours for
+				public DNS to update after a change.""".format(env['PRIMARY_HOSTNAME'], env['PRIMARY_HOSTNAME'], env['PUBLIC_IP'], ns_ips))
 	else:
-		output.print_error("""Nameserver glue records are incorrect. The ns1.{} and ns2.{} nameservers must be configured at your domain name
-			registrar as having the IP address {}. They currently report addresses of {}. It may take several hours for
-			public DNS to update after a change.""".format(env['PRIMARY_HOSTNAME'], env['PRIMARY_HOSTNAME'], env['PUBLIC_IP'], ns_ips))
+		output.print_ok("Domain uses external DNS. Glue record checks skipped.")
 
 	# Check that PRIMARY_HOSTNAME resolves to PUBLIC_IP[V6] in public DNS.
 	ipv6 = query_dns(domain, "AAAA") if env.get("PUBLIC_IPV6") else None
@@ -507,20 +532,23 @@ def check_primary_hostname_dns(domain, env, output, dns_domains, dns_zonefiles):
 		output.print_error(f"""This box's reverse DNS is currently {existing_rdns_v4} (IPv4) and {existing_rdns_v6} (IPv6), but it should be {domain}. Your ISP or cloud provider will have instructions
 			on setting up reverse DNS for this box.""" )
 
-	# Check the TLSA record.
-	tlsa_qname = "_25._tcp." + domain
-	tlsa25 = query_dns(tlsa_qname, "TLSA", nxdomain=None)
-	tlsa25_expected = build_tlsa_record(env)
-	if tlsa25 == tlsa25_expected:
-		output.print_ok(f"""The DANE TLSA record for incoming mail is correct ({tlsa_qname}).""",)
-	elif tlsa25 is None:
-		if has_dnssec:
-			# Omit a warning about it not being set if DNSSEC isn't enabled,
-			# since TLSA shouldn't be used without DNSSEC.
-			output.print_warning("""The DANE TLSA record for incoming mail is not set. This is optional.""")
+	# Check the TLSA record — skip if using external DNS (TLSA requires MiaB-managed DNSSEC).
+	if not external_dns:
+		tlsa_qname = "_25._tcp." + domain
+		tlsa25 = query_dns(tlsa_qname, "TLSA", nxdomain=None)
+		tlsa25_expected = build_tlsa_record(env)
+		if tlsa25 == tlsa25_expected:
+			output.print_ok(f"""The DANE TLSA record for incoming mail is correct ({tlsa_qname}).""",)
+		elif tlsa25 is None:
+			if has_dnssec:
+				# Omit a warning about it not being set if DNSSEC isn't enabled,
+				# since TLSA shouldn't be used without DNSSEC.
+				output.print_warning("""The DANE TLSA record for incoming mail is not set. This is optional.""")
+		else:
+			output.print_error(f"""The DANE TLSA record for incoming mail ({tlsa_qname}) is not correct. It is '{tlsa25}' but it should be '{tlsa25_expected}'.
+				It may take several hours for public DNS to update after a change.""")
 	else:
-		output.print_error(f"""The DANE TLSA record for incoming mail ({tlsa_qname}) is not correct. It is '{tlsa25}' but it should be '{tlsa25_expected}'.
-			It may take several hours for public DNS to update after a change.""")
+		output.print_ok("Domain uses external DNS. TLSA record check skipped.")
 
 	# Check that the hostmaster@ email address exists.
 	check_alias_exists("Hostmaster contact address", "hostmaster@" + domain, env, output)
@@ -536,6 +564,11 @@ def check_alias_exists(alias_name, alias, env, output):
 		output.print_error(f"""You must add a mail alias for {alias} which directs email to you or another administrator.""")
 
 def check_dns_zone(domain, env, output, dns_zonefiles):
+	# If this domain uses external DNS, skip NS/DNSSEC/secondary NS checks entirely.
+	if is_external_dns_domain(domain, env):
+		output.print_ok(f"Domain {domain} uses external DNS. NS/DNSSEC checks skipped.")
+		return
+
 	# If a DS record is set at the registrar, check DNSSEC first because it will affect the NS query.
 	# If it is not set, we suggest it last.
 	if query_dns(domain, "DS", nxdomain=None) is not None:
@@ -584,11 +617,11 @@ def check_dns_zone(domain, env, output, dns_zonefiles):
 				continue
 			# Choose the first IP if nameserver returns multiple
 			ns_ip = ns_ips.split('; ')[0]
-			
+
 			# No need to check if we could not obtain the SOA record
 			if SOARecord == '[timeout]':
 				checkSOA = False
-			else:			
+			else:
 				checkSOA = True
 
 			# Now query it to see what it says about this domain.
@@ -628,8 +661,8 @@ def check_dns_zone_suggestions(domain, env, output, dns_zonefiles, domains_with_
 		output.print_warning(f"""A redirect from 'www.{domain}' has been disabled for this domain because you have set a custom DNS record on the www subdomain.""")
 
 	# Since DNSSEC is optional, if a DS record is NOT set at the registrar suggest it.
-	# (If it was set, we did the check earlier.)
-	if query_dns(domain, "DS", nxdomain=None) is None:
+	# (If it was set, we did the check earlier.) Skip for external DNS domains.
+	if not is_external_dns_domain(domain, env) and query_dns(domain, "DS", nxdomain=None) is None:
 		check_dnssec(domain, env, output, dns_zonefiles)
 
 
@@ -826,7 +859,9 @@ def check_web_domain(domain, rounded_time, ssl_certificates, env, output):
 	# See if the domain's A record resolves to our PUBLIC_IP. This is already checked
 	# for PRIMARY_HOSTNAME, for which it is required for mail specifically. For it and
 	# other domains, it is required to access its website.
-	if domain != env['PRIMARY_HOSTNAME']:
+	# Skip this check for domains using external DNS — their A records may point
+	# to a different web server (e.g., a CDN or separate hosting).
+	if domain != env['PRIMARY_HOSTNAME'] and not is_external_dns_domain(domain, env):
 		ok_values = []
 		for (rtype, expected) in (("A", env['PUBLIC_IP']), ("AAAA", env.get('PUBLIC_IPV6'))):
 			if not expected: continue # IPv6 is not configured
@@ -841,6 +876,8 @@ def check_web_domain(domain, rounded_time, ssl_certificates, env, output):
 
 		# If both A and AAAA are correct...
 		output.print_ok("Domain resolves to this box's IP address. [{} ↦ {}]".format(domain, '; '.join(ok_values)))
+	elif domain != env['PRIMARY_HOSTNAME']:
+		output.print_ok(f"Domain {domain} uses external DNS. A/AAAA record check skipped.")
 
 
 	# We need a TLS certificate for PRIMARY_HOSTNAME because that's where the
