@@ -669,6 +669,33 @@ def privacy_status_set():
 	utils.write_settings(config, env)
 	return "OK"
 
+# SPAM WHITELIST/BLACKLIST
+
+@app.route('/system/spam-whitelist', methods=["GET"])
+@authorized_personnel_only
+def spam_whitelist_get():
+	settings = utils.load_settings(env)
+	return json_response({
+		"whitelist": settings.get("spam_whitelist", []),
+		"blacklist": settings.get("spam_blacklist", []),
+	})
+
+@app.route('/system/spam-whitelist', methods=["POST"])
+@authorized_personnel_only
+def spam_whitelist_set():
+	settings = utils.load_settings(env)
+	whitelist = [w.strip() for w in request.form.get('whitelist', '').split('\n') if w.strip()]
+	blacklist = [b.strip() for b in request.form.get('blacklist', '').split('\n') if b.strip()]
+	settings['spam_whitelist'] = whitelist
+	settings['spam_blacklist'] = blacklist
+	utils.write_settings(settings, env)
+	return json_response({
+		"status": "ok",
+		"whitelist": whitelist,
+		"blacklist": blacklist,
+		"note": "Run 'sudo mailinabox' to apply.",
+	})
+
 # MUNIN
 
 @app.route('/munin/')
