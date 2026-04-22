@@ -167,6 +167,43 @@ with open('$BLACKLIST_FILE', 'w') as f:
     f.write('\n'.join(bl) + '\n' if bl else '')
 PYEOF
 
+# Courier impersonation + RO phishing subject rules (geseidl-edition)
+COURIER_DISPLAY_MAP="/etc/rspamd/local.d/courier_display.map"
+COURIER_REAL_MAP="/etc/rspamd/local.d/courier_real_domains.map"
+RO_PHISH_SUBJ_MAP="/etc/rspamd/local.d/ro_phish_subjects.map"
+[ -f "$COURIER_DISPLAY_MAP" ] || cat > "$COURIER_DISPLAY_MAP" << 'MAPEOF'
+/(?i)(DHL|DPD|FanCourier|FAN Courier|GLS|Sameday|Nemo|Urgent\s*Cargus|Cargus|Posta Romana|PostaRomana|UPS|FedEx|TNT)\s*(RO|Romania|ROMANIA|Express)/
+/(?i)Adrian\s+Cristea\s*\(DHL/
+MAPEOF
+[ -f "$COURIER_REAL_MAP" ] || cat > "$COURIER_REAL_MAP" << 'MAPEOF'
+dhl.com
+dhl.ro
+mydhl.com
+dhlexpress.com
+dpd.com
+dpd.ro
+fancourier.ro
+fan-courier.ro
+gls-romania.ro
+gls-group.eu
+sameday.ro
+urgentcargus.ro
+cargus.ro
+posta-romana.ro
+postaromana.ro
+ups.com
+ups.ro
+fedex.com
+fedex.ro
+tnt.com
+MAPEOF
+[ -f "$RO_PHISH_SUBJ_MAP" ] || cat > "$RO_PHISH_SUBJ_MAP" << 'MAPEOF'
+/(?i)^Declaratiile\s+din\s+atasament\s+completate\s+si\s+semnate/
+/(?i)Declaratii.*atasament.*semnate/
+/(?i)^Factura\s+restanta\s+neplatita/
+/(?i)^Documente\s+atasate\s+spre\s+aprobare/
+MAPEOF
+
 cat > /etc/rspamd/local.d/multimap.conf << EOF
 WHITELIST_SENDER_DOMAIN {
     type = "from";
@@ -181,11 +218,42 @@ BLACKLIST_SENDER_DOMAIN {
     score = 10.0;
     description = "Blacklisted sender (MiaB admin)";
 }
+
+COURIER_IMPERSONATION_DISPLAY {
+    type = "header";
+    header = "From";
+    regexp = true;
+    map = "$COURIER_DISPLAY_MAP";
+    score = 5.0;
+    description = "Display name impersonates a courier brand";
+}
+
+WHITELIST_COURIER_DOMAIN {
+    type = "from";
+    map = "$COURIER_REAL_MAP";
+    score = -10.0;
+    description = "Legitimate courier sender domain";
+}
+
+RO_PHISH_SUBJECT {
+    type = "header";
+    header = "Subject";
+    regexp = true;
+    map = "$RO_PHISH_SUBJ_MAP";
+    score = 4.0;
+    description = "Subject matches known RO phishing wave";
+}
+EOF
+
+# Ensure neural + other Redis-aware modules find redis (BUGFIX: empty redis.conf
+# caused neural module to silently disable, losing ~1.5 months of training.)
+cat > /etc/rspamd/local.d/redis.conf << 'EOF'
+servers = "127.0.0.1";
 EOF
 
 # === DOVECOT IMAPSIEVE ===
 
-# Add imap_sieve to 20-imap.conf (idempotent — only if not already present).
+# Add imap_sieve to 20-imap.conf (idempotent ï¿½ only if not already present).
 # Do NOT use a separate protocol imap {} block in 90-imapsieve.conf because
 # Dovecot's last protocol block wins and would override 20-imap.conf plugins.
 if ! grep -q 'imap_sieve' /etc/dovecot/conf.d/20-imap.conf 2>/dev/null; then
@@ -197,14 +265,25 @@ plugin {
   sieve_plugins = sieve_imapsieve sieve_extprograms
   sieve_global_extensions = +vnd.dovecot.pipe +vnd.dovecot.environment
 
+  # Learn SPAM when user moves into Spam OR Junk (users frequently have both)
   imapsieve_mailbox1_name = Spam
   imapsieve_mailbox1_causes = COPY APPEND
   imapsieve_mailbox1_before = file:/etc/dovecot/sieve/learn-spam.sieve
 
+  imapsieve_mailbox3_name = Junk
+  imapsieve_mailbox3_causes = COPY APPEND
+  imapsieve_mailbox3_before = file:/etc/dovecot/sieve/learn-spam.sieve
+
+  # Learn HAM when user moves out of Spam or Junk (not to Trash)
   imapsieve_mailbox2_name = *
   imapsieve_mailbox2_from = Spam
   imapsieve_mailbox2_causes = COPY
   imapsieve_mailbox2_before = file:/etc/dovecot/sieve/learn-ham.sieve
+
+  imapsieve_mailbox4_name = *
+  imapsieve_mailbox4_from = Junk
+  imapsieve_mailbox4_causes = COPY
+  imapsieve_mailbox4_before = file:/etc/dovecot/sieve/learn-ham.sieve
 
   sieve_pipe_bin_dir = /etc/dovecot/sieve
 }
