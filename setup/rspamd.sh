@@ -167,10 +167,13 @@ with open('$BLACKLIST_FILE', 'w') as f:
     f.write('\n'.join(bl) + '\n' if bl else '')
 PYEOF
 
-# Courier impersonation + RO phishing subject rules (geseidl-edition)
+# Brand impersonation + RO phishing subject framework (geseidl-edition)
+BRAND_DISPLAY_MAP="/etc/rspamd/local.d/brand_display.map"
+BRAND_REAL_MAP="/etc/rspamd/local.d/brand_real_domains.map"
 COURIER_DISPLAY_MAP="/etc/rspamd/local.d/courier_display.map"
 COURIER_REAL_MAP="/etc/rspamd/local.d/courier_real_domains.map"
 RO_PHISH_SUBJ_MAP="/etc/rspamd/local.d/ro_phish_subjects.map"
+NON_RO_TLD_MAP="/etc/rspamd/local.d/non_ro_tld.map"
 [ -f "$COURIER_DISPLAY_MAP" ] || cat > "$COURIER_DISPLAY_MAP" << 'MAPEOF'
 /(?i)(DHL|DPD|FanCourier|FAN Courier|GLS|Sameday|Nemo|Urgent\s*Cargus|Cargus|Posta Romana|PostaRomana|UPS|FedEx|TNT)\s*(RO|Romania|ROMANIA|Express)/
 /(?i)Adrian\s+Cristea\s*\(DHL/
@@ -204,6 +207,15 @@ MAPEOF
 /(?i)^Documente\s+atasate\s+spre\s+aprobare/
 MAPEOF
 
+# Brand impersonation map (extended beyond couriers: banks, ANAF, utilities, big-tech)
+# Deployed as empty placeholders here; production fill via provision copy from
+# NET-ADMIN/GESEIDL/GES-MAIL01/brand_display.map + brand_real_domains.map.
+[ -f "$BRAND_DISPLAY_MAP" ] || cp "$COURIER_DISPLAY_MAP" "$BRAND_DISPLAY_MAP" 2>/dev/null || touch "$BRAND_DISPLAY_MAP"
+[ -f "$BRAND_REAL_MAP" ] || cp "$COURIER_REAL_MAP" "$BRAND_REAL_MAP" 2>/dev/null || touch "$BRAND_REAL_MAP"
+[ -f "$NON_RO_TLD_MAP" ] || cat > "$NON_RO_TLD_MAP" << 'MAPEOF'
+/@[^>]+\.(com|net|org|info|biz|xyz|top|click|online|site|fun|live|rs|tr|bg|hu|ua|ru|cn|in|pk|ng|ph|br|mx|vn|id|th|ke|za|ng|ma|eg)$/
+MAPEOF
+
 cat > /etc/rspamd/local.d/multimap.conf << EOF
 WHITELIST_SENDER_DOMAIN {
     type = "from";
@@ -219,13 +231,47 @@ BLACKLIST_SENDER_DOMAIN {
     description = "Blacklisted sender (MiaB admin)";
 }
 
+BRAND_DISPLAY_MATCH {
+    type = "header";
+    header = "From";
+    regexp = true;
+    map = "$BRAND_DISPLAY_MAP";
+    score = 0.01;
+    description = "Brand/institution name in From display";
+}
+
+BRAND_SUBJECT_MATCH {
+    type = "header";
+    header = "Subject";
+    regexp = true;
+    map = "$BRAND_DISPLAY_MAP";
+    score = 0.01;
+    description = "Brand/institution name in Subject";
+}
+
+WHITELIST_BRAND_DOMAIN {
+    type = "from";
+    map = "$BRAND_REAL_MAP";
+    score = -8.0;
+    description = "Sender domain belongs to legitimate brand/institution";
+}
+
+FROM_NON_RO_TLD {
+    type = "header";
+    header = "From";
+    regexp = true;
+    map = "$NON_RO_TLD_MAP";
+    score = 0.0;
+    description = "Sender domain is non-.ro TLD (informational)";
+}
+
 COURIER_IMPERSONATION_DISPLAY {
     type = "header";
     header = "From";
     regexp = true;
     map = "$COURIER_DISPLAY_MAP";
     score = 5.0;
-    description = "Display name impersonates a courier brand";
+    description = "Display name impersonates a courier brand (legacy rule)";
 }
 
 WHITELIST_COURIER_DOMAIN {
@@ -244,6 +290,45 @@ RO_PHISH_SUBJECT {
     description = "Subject matches known RO phishing wave";
 }
 EOF
+
+# Composites for brand impersonation + foreign-origin RO phishing
+cat > /etc/rspamd/local.d/composites.conf << 'CEOF'
+SUSPICIOUS_NO_AUTH {
+    expression = "R_DKIM_NA & HFILTER_HOSTNAME_UNKNOWN";
+    score = 3.0;
+    description = "No DKIM signature from host without reverse DNS";
+}
+
+SPAM_FRIENDLY_SETUP {
+    expression = "R_DKIM_NA & HFILTER_HOSTNAME_UNKNOWN & DMARC_POLICY_ALLOW";
+    score = 4.0;
+    description = "No DKIM + no reverse DNS + DMARC=none (disposable spam domain)";
+}
+
+BRAND_IMPERSONATION {
+    expression = "(BRAND_DISPLAY_MATCH | BRAND_SUBJECT_MATCH) & !WHITELIST_BRAND_DOMAIN";
+    score = 7.0;
+    description = "Brand/institution name claimed but sender domain not legitimate";
+}
+
+FOREIGN_PHISH_RO {
+    expression = "R_DKIM_NA & FROM_NON_RO_TLD & (RO_PHISH_SUBJECT | BRAND_SUBJECT_MATCH)";
+    score = 4.0;
+    description = "Foreign TLD sender + RO phishing subject pattern + no DKIM";
+}
+
+DMARC_QUARANTINE_SPF_ONLY {
+    expression = "DMARC_POLICY_ALLOW & R_DKIM_NA & R_SPF_ALLOW";
+    score = 1.0;
+    description = "DMARC passes only via SPF (no DKIM signature)";
+}
+
+FOREIGN_MAIL_RO_CONTENT {
+    expression = "FROM_NON_RO_TLD & R_MIXED_CHARSET & R_DKIM_NA";
+    score = 2.0;
+    description = "Foreign TLD + mixed charset + no DKIM (RO content from foreign server)";
+}
+CEOF
 
 # Ensure neural + other Redis-aware modules find redis (BUGFIX: empty redis.conf
 # caused neural module to silently disable, losing ~1.5 months of training.)
