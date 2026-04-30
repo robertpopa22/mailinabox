@@ -77,7 +77,8 @@ Ubuntu 22.04 LTS reaches end of standard support in April 2027. The MiaB upstrea
 
 We documented every step, every issue we hit, every fix we applied. We also wrote scripts that automate the safe parts:
 
-- 📖 **Full guide**: [`UPGRADE_22.04_TO_24.04_GUIDE.md`](UPGRADE_22.04_TO_24.04_GUIDE.md) — prerequisites, snapshot, do-release-upgrade, MiaB venv rebuild, verification, rollback.
+- 📖 **Full step-by-step guide**: [`UPGRADE_22.04_TO_24.04_GUIDE.md`](UPGRADE_22.04_TO_24.04_GUIDE.md) — prerequisites, snapshot, do-release-upgrade, MiaB venv rebuild, verification, rollback.
+- 📋 **Plan template**: [`UPGRADE_PLAN_TEMPLATE.md`](UPGRADE_PLAN_TEMPLATE.md) — copy + fill in your environment to plan your own migration (scope, inventory, risks, decision gates, rollback runbook, verification checklist). Keep your filled version private (it will contain your hostnames/IPs/domains).
 - 🛠️ **`setup-helpers/backup-mail-configs.sh`** — single-command tarball of every critical config + DKIM key + Bayes DB before you start.
 - 🛠️ **`setup-helpers/upgrade-2204-to-2404.sh`** — phased automation (`--phase prep|os|miab|verify|all`) with confirmation gates.
 
