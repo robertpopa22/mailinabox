@@ -47,7 +47,7 @@ A complete alternative to SpamAssassin. Toggle from the MiaB admin panel:
 - **`spamd` and `spamassassin.sh`** kept as a reverse migration path — toggle back if rspamd misbehaves for your environment.
 - **System Spam UI** — `management/templates/system-spam.html` adds an admin panel page for spam-filter status, Bayes statistics, and manual learn actions.
 
-Branch: `feature/rspamd-spam-filter` (now superseded by `geseidl-edition-v75` which rebases onto v75 + carries the rspamd integration on top).
+Branch: `feature/rspamd-spam-filter` (now superseded by `main` which rebases onto v75 + carries the rspamd integration on top).
 
 ### 🔧 Operational fixes
 
@@ -98,15 +98,15 @@ We documented every step, every issue we hit, every fix we applied. We also wrot
 
 | Branch / Tag | Purpose |
 |---|---|
-| `main` | Synced with `mail-in-a-box/mailinabox` `main` (currently v75) |
-| `geseidl-edition-v75` | **Production-deploy branch.** v75 + rspamd + all Geseidl fixes. Use this. |
+| `main` | **Default branch. Production-deploy.** v75 + rspamd + all Geseidl fixes. Use this. |
+| `upstream-mirror` | Sync of `mail-in-a-box/mailinabox` upstream `main` (currently v75). Used as rebase reference when upstream ships new releases. |
 | `geseidl-v75-2204to2404-validated` (tag) | Snapshot of the exact code that survived our 22.04 → 24.04 upgrade |
 | `geseidl-v75-2026-04-30` (tag) | Snapshot of the rebased-on-v75 baseline pre-upgrade |
 | `feature/rspamd-spam-filter` | Original rspamd integration branch (v74-base, kept for history) |
-| `feature/*`, `fix/*` | Individual feature/fix branches (most folded into `geseidl-edition-v75`) |
+| `feature/*`, `fix/*` | Individual feature/fix branches (most folded into `main`) |
 | `backup/mail02-pre-upgrade-2026-04-30` | Manifest + SHA256 of the production config tarball pre-upgrade (tarball NOT in git — contains private keys) |
 
-If you want to track us, watch this repo and follow `geseidl-edition-v75`. It rebases onto upstream tags as they ship.
+If you want to track us, watch this repo and follow `main` (default). It rebases onto upstream tags as they ship.
 
 ---
 
@@ -117,7 +117,7 @@ For a fresh install, the upstream MiaB process applies — just clone this fork 
 ```bash
 git clone https://github.com/robertpopa22/mailinabox.git
 cd mailinabox
-git checkout geseidl-edition-v75
+git checkout main
 sudo setup/start.sh
 ```
 
@@ -127,7 +127,7 @@ For an existing MiaB v74-base server who wants the rspamd features without OS ch
 cd /root/mailinabox
 git remote add geseidl https://github.com/robertpopa22/mailinabox.git
 git fetch geseidl
-git checkout -b geseidl-edition-v75 geseidl/geseidl-edition-v75
+git checkout main
 sudo setup/start.sh    # idempotent; will install rspamd
 ```
 

@@ -446,7 +446,7 @@ Noble defaults to tmpfs `/tmp`. Use `/root/` or `/var/log/` for persistent logs.
 - **Tools used**: `setup-helpers/backup-mail-configs.sh`, `setup-helpers/upgrade-2204-to-2404.sh` (in this repo)
 - **MiaB upstream**: https://github.com/mail-in-a-box/mailinabox
 - **This fork (Geseidl Edition)**: https://github.com/robertpopa22/mailinabox
-- **Tested branch**: `geseidl-edition-v75` (rebased on v75 + rspamd customs)
+- **Tested branch**: `main` (rebased on v75 + rspamd customs)
 - **Deploy tag**: `geseidl-v75-2026-04-30`
 
 ---
