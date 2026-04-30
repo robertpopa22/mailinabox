@@ -6,14 +6,14 @@
 
 ## What this fork is
 
-A **continuously-used production fork** of MiaB. Not theoretical, not a sandbox: this codebase runs **mail.geseidl.ro** every day — the live mail server for [Geseidl Consulting Group](https://geseidl.ro) and our subsidiaries.
+A **continuously-used production fork** of MiaB. Not theoretical, not a sandbox: this codebase runs the live mail server of [Geseidl Consulting Group](https://geseidl.ro) every day.
 
-Stats (as of April 2026):
+Production scale (as of April 2026):
 - **70+ active mailboxes**
-- **4 hosted domains** (geseidl.ro, biamco.ro, energycycling.ro, conta-ploiesti.ro)
-- **424 GB user-data** (mailboxes + Nextcloud + DKIM + SSL state)
+- **Multiple hosted domains** (one primary + several with always-BCC-archive forwards)
+- **400+ GB of user-data** (mailboxes + Nextcloud + DKIM + SSL state)
 - **Ubuntu 24.04 LTS + kernel 6.8** (in-place upgrade from 22.04, validated 2026-04-30)
-- **1.08M-message email archive** (FTS5 indexed) for archival/audit purposes
+- **1M+ message email archive** (FTS5 indexed) for retention/audit purposes
 - **3+ years operational history** with iterative improvements committed back here
 
 Every change in this fork was developed because we needed it in production. If you adopt this fork, you are running essentially the same code we run for our own business email.
@@ -67,7 +67,7 @@ Several smaller fixes that came out of running MiaB long-term:
 
 Ubuntu 22.04 LTS reaches end of standard support in April 2027. The MiaB upstream answer to "how do I upgrade?" is, fundamentally: *rebuild the VM from scratch and restore /home/user-data*. That is reasonable advice for a one-click appliance — but for organisations with a real production server, real users, and real downtime concerns, it is not always practical.
 
-**On 2026-04-30 we successfully performed an in-place upgrade** of mail.geseidl.ro from Ubuntu 22.04 to **Ubuntu 24.04 LTS** with **only 1h12min downtime** — no rebuild, no DNS changes, no mailbox migration. The upgrade pulled in:
+**On 2026-04-30 we successfully performed an in-place upgrade** of our production mail server from Ubuntu 22.04 to **Ubuntu 24.04 LTS** with **only 1h12min downtime** — no rebuild, no DNS changes, no mailbox migration. The upgrade pulled in:
 
 - **Linux kernel 6.8** (vs 5.15) — much newer security patches, including CVE-2026-31431 "Copy Fail" mitigation
 - **PHP 8.3** (vs 8.0)
@@ -86,7 +86,6 @@ We documented every step, every issue we hit, every fix we applied. We also wrot
 > ⚠️ **VM-level backup + console access are mandatory** before you start. This is reversible only if you can roll back to a snapshot.
 
 **Validated production deployment**:
-- Server: mail.geseidl.ro
 - Date: 2026-04-30
 - Downtime: 1h12min (sub 2h timebox)
 - Users impacted: 70+, no mail loss
@@ -178,7 +177,7 @@ Avoid:
 
 ## Maintained by
 
-[Geseidl IT Solutions](https://geseidl.ro/servicii-it), part of [Geseidl Consulting Group](https://geseidl.ro). We are an accounting and IT services group based in Bucharest, Romania, running our own infrastructure for ~70 employees and ~80 client companies. This fork exists because we needed it for ourselves; we publish it because someone else might too.
+[Geseidl IT Solutions](https://geseidl.ro/servicii-it), part of [Geseidl Consulting Group](https://geseidl.ro). We are a consulting group based in Bucharest, Romania. This fork exists because we needed it for ourselves; we publish it because someone else might too.
 
 Contact: open an issue on this repo. For commercial support of MiaB deployments based on this fork, [Geseidl IT Solutions](https://geseidl.ro/servicii-it) offers paid engagements.
 

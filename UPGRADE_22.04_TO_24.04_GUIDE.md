@@ -1,6 +1,6 @@
 # Mail-in-a-Box: In-place Ubuntu 22.04 → 24.04 Upgrade Guide
 
-> **Status**: ✅ Successfully validated 2026-04-30 on a production server (mail.geseidl.ro, 70+ users, 424GB user-data, 4 hosted domains). Real downtime: **~1h12min**.
+> **Status**: ✅ Successfully validated 2026-04-30 on a production server (70+ users, 400+ GB user-data, multiple hosted domains). Real downtime: **~1h12min**.
 > **Official MiaB warning**: v75 officially supports ONLY Ubuntu 22.04. This guide describes how to safely bypass that limitation.
 > **Audience**: intermediate-level Linux admins able to follow step-by-step commands. If this is your first Linux server, **don't try this yet** — test on a disposable VM first.
 
@@ -453,10 +453,10 @@ Noble defaults to tmpfs `/tmp`. Use `/root/` or `/var/log/` for persistent logs.
 
 ## Validation status
 
-- [x] **2026-04-30**: Geseidl Consulting Group production server (mail.geseidl.ro)
+- [x] **2026-04-30**: Geseidl Consulting Group production server
   - 70+ active users
-  - 4 hosted domains (geseidl.ro, biamco.ro, energycycling.ro, conta-ploiesti.ro)
-  - 424GB user-data
+  - Multiple hosted domains (one primary + always-BCC-archive forwards)
+  - 400+ GB user-data
   - Downtime: 1h12min
   - Issues encountered: UFW limit fail2ban, /tmp clear, Python venv rebuild, missing requirements.txt
   - All issues are documented here with fixes
