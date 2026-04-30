@@ -1,25 +1,192 @@
-Mail-in-a-Box — Geseidl Edition
-================================
+# Mail-in-a-Box — Geseidl Edition
+
+> **This is a fork of [mail-in-a-box/mailinabox](https://github.com/mail-in-a-box/mailinabox)** with production-tested enhancements maintained by [Geseidl IT Solutions](https://geseidl.ro/servicii-it). It is **not** the upstream project. For the official one-click MiaB setup guide, see [mailinabox.email](https://mailinabox.email).
+
+<a href="https://geseidl.ro/servicii-it"><img src="https://geseidl.ro/assets/icons/logo-green.png" alt="Geseidl Consulting Group" height="60"></a>
+
+## What this fork is
+
+A **continuously-used production fork** of MiaB. Not theoretical, not a sandbox: this codebase runs **mail.geseidl.ro** every day — the live mail server for [Geseidl Consulting Group](https://geseidl.ro) and our subsidiaries.
+
+Stats (as of April 2026):
+- **70+ active mailboxes**
+- **4 hosted domains** (geseidl.ro, biamco.ro, energycycling.ro, conta-ploiesti.ro)
+- **424 GB user-data** (mailboxes + Nextcloud + DKIM + SSL state)
+- **Ubuntu 24.04 LTS + kernel 6.8** (in-place upgrade from 22.04, validated 2026-04-30)
+- **1.08M-message email archive** (FTS5 indexed) for archival/audit purposes
+- **3+ years operational history** with iterative improvements committed back here
+
+Every change in this fork was developed because we needed it in production. If you adopt this fork, you are running essentially the same code we run for our own business email.
+
+---
+
+## Why we forked
+
+Mail-in-a-Box upstream is excellent for what it sets out to be: a one-click, opinionated mail server appliance. But "one-click" deliberately limits what you can customise. We needed three things upstream wouldn't add (and rightly so — it's not their goal):
+
+1. **A modern spam filter (rspamd)** to replace SpamAssassin, with neural network training, brand-impersonation detection tuned for the Romanian market, and Bayes auto-retraining from the user's Trash folder.
+2. **Operational reality fixes** — running MiaB behind NAT, with external DNS managed elsewhere, with a dedicated mail-archive account that BCCs all traffic.
+3. **Long-lived OS support** — clean in-place upgrades when Ubuntu LTS ages out, without rebuilding the VM from scratch.
+
+We maintain everything in branches so we can rebase onto upstream releases (currently aligned with **v75**, April 2026). When upstream ships, we follow within days.
+
+---
+
+## What you get on top of upstream MiaB
+
+### 🛡️ Modern spam filtering — rspamd (with admin panel UI)
+
+A complete alternative to SpamAssassin. Toggle from the MiaB admin panel:
+
+- **`setup/rspamd.sh`** — full installer (~450 lines, Ubuntu-aware)
+- **Neural network** module configured + trained — ML-based spam classification on top of rule-based scoring
+- **Brand impersonation framework** — detects spoofs of common Romanian and international targets (banks, couriers, ANAF, tech vendors)
+- **Foreign-origin RO phishing composites** — multi-signal rules for Romanian-language phishing from non-RO infrastructure
+- **IMAPSieve Trash → Bayes auto-retrain** — when a user moves a message to Trash/Junk, dovecot's IMAPSieve pipeline auto-feeds it to rspamd's Bayes classifier. Continuous learning at zero admin effort.
+- **`force_actions` DMARC override** for Gmail forwards — Gmail rewrites the From header on forwarded mail, breaking DMARC alignment. We override to allow it through instead of bouncing legitimate forwarded mail.
+- **`spamd` and `spamassassin.sh`** kept as a reverse migration path — toggle back if rspamd misbehaves for your environment.
+- **System Spam UI** — `management/templates/system-spam.html` adds an admin panel page for spam-filter status, Bayes statistics, and manual learn actions.
+
+Branch: `feature/rspamd-spam-filter` (now superseded by `geseidl-edition-v75` which rebases onto v75 + carries the rspamd integration on top).
+
+### 🔧 Operational fixes
+
+Several smaller fixes that came out of running MiaB long-term:
+
+| Branch | What it does |
+|---|---|
+| `feature/nat-aware-checks` | Status checks that don't fail on systems behind NAT (real public IP differs from local IP) |
+| `feature/external-dns-settings` | Allow external DNS providers (Cloudflare, etc.) instead of MiaB's bundled nsd |
+| `feature/email-archive-option` | Always-BCC-archive setup (`archive@yourdomain.tld` receives copies of all traffic for audit/legal retention) |
+| `feature/imapsieve-trash-fix` | Reliable Bayes retrain trigger when users delete spam |
+| `feature/whitelist-management` | Per-user whitelist UI in admin panel |
+| `feature/spamhaus-forwarders-fix` / `fix/spamhaus-dns-forwarders` | Stable DNS resolver behaviour for Spamhaus DNSBL when using external forwarders |
+| `feature/rspamd-hardening` | Hardened rspamd config (rate-limits, weighted scores, custom `forbidden_file_extensions.map`) |
+
+### 🔐 In-place security upgrades — the headline contribution
+
+Ubuntu 22.04 LTS reaches end of standard support in April 2027. The MiaB upstream answer to "how do I upgrade?" is, fundamentally: *rebuild the VM from scratch and restore /home/user-data*. That is reasonable advice for a one-click appliance — but for organisations with a real production server, real users, and real downtime concerns, it is not always practical.
+
+**On 2026-04-30 we successfully performed an in-place upgrade** of mail.geseidl.ro from Ubuntu 22.04 to **Ubuntu 24.04 LTS** with **only 1h12min downtime** — no rebuild, no DNS changes, no mailbox migration. The upgrade pulled in:
+
+- **Linux kernel 6.8** (vs 5.15) — much newer security patches, including CVE-2026-31431 "Copy Fail" mitigation
+- **PHP 8.3** (vs 8.0)
+- **Python 3.12** (vs 3.10)
+- **Updated Hyper-V Linux Integration Services** (relevant if you run on Hyper-V)
+- All other Ubuntu 24.04 base improvements
+
+We documented every step, every issue we hit, every fix we applied. We also wrote scripts that automate the safe parts:
+
+- 📖 **Full guide**: [`UPGRADE_22.04_TO_24.04_GUIDE.md`](UPGRADE_22.04_TO_24.04_GUIDE.md) — prerequisites, snapshot, do-release-upgrade, MiaB venv rebuild, verification, rollback.
+- 🛠️ **`setup-helpers/backup-mail-configs.sh`** — single-command tarball of every critical config + DKIM key + Bayes DB before you start.
+- 🛠️ **`setup-helpers/upgrade-2204-to-2404.sh`** — phased automation (`--phase prep|os|miab|verify|all`) with confirmation gates.
+
+> ⚠️ **The MiaB upstream `setup/preflight.sh` strictly rejects Ubuntu 24.04.** Running `setup/start.sh` after the OS upgrade WILL abort. Our guide explains exactly what to do instead (manually rebuild the Python venv + reinstall the embedded pip dependencies). Every problem we hit (UFW LIMIT bans, fail2ban whitelist resets, stale Python venv, missing `requirements.txt`, the `cryptography==37.0.2` pin failing on Python 3.12, `php8.0-fpm` vs `php8.3-fpm` confusion, user-data UID change) is covered.
+>
+> ⚠️ **VM-level backup + console access are mandatory** before you start. This is reversible only if you can roll back to a snapshot.
+
+**Validated production deployment**:
+- Server: mail.geseidl.ro
+- Date: 2026-04-30
+- Downtime: 1h12min (sub 2h timebox)
+- Users impacted: 70+, no mail loss
+- Stable tag for this upgrade: **`geseidl-v75-2204to2404-validated`**
+
+---
+
+## Branches and tags
+
+| Branch / Tag | Purpose |
+|---|---|
+| `main` | Synced with `mail-in-a-box/mailinabox` `main` (currently v75) |
+| `geseidl-edition-v75` | **Production-deploy branch.** v75 + rspamd + all Geseidl fixes. Use this. |
+| `geseidl-v75-2204to2404-validated` (tag) | Snapshot of the exact code that survived our 22.04 → 24.04 upgrade |
+| `geseidl-v75-2026-04-30` (tag) | Snapshot of the rebased-on-v75 baseline pre-upgrade |
+| `feature/rspamd-spam-filter` | Original rspamd integration branch (v74-base, kept for history) |
+| `feature/*`, `fix/*` | Individual feature/fix branches (most folded into `geseidl-edition-v75`) |
+| `backup/mail02-pre-upgrade-2026-04-30` | Manifest + SHA256 of the production config tarball pre-upgrade (tarball NOT in git — contains private keys) |
+
+If you want to track us, watch this repo and follow `geseidl-edition-v75`. It rebases onto upstream tags as they ship.
+
+---
+
+## Quick start: deploy this fork on a fresh Ubuntu 22.04 server
+
+For a fresh install, the upstream MiaB process applies — just clone this fork instead:
+
+```bash
+git clone https://github.com/robertpopa22/mailinabox.git
+cd mailinabox
+git checkout geseidl-edition-v75
+sudo setup/start.sh
+```
+
+For an existing MiaB v74-base server who wants the rspamd features without OS changes:
+
+```bash
+cd /root/mailinabox
+git remote add geseidl https://github.com/robertpopa22/mailinabox.git
+git fetch geseidl
+git checkout -b geseidl-edition-v75 geseidl/geseidl-edition-v75
+sudo setup/start.sh    # idempotent; will install rspamd
+```
+
+For an existing MiaB on Ubuntu 22.04 who wants to upgrade to 24.04 LTS, **read [`UPGRADE_22.04_TO_24.04_GUIDE.md`](UPGRADE_22.04_TO_24.04_GUIDE.md) first.**
+
+---
+
+## Maintenance commitment
+
+This fork is maintained by Robert Popa and the Geseidl IT Solutions team. We:
+
+- **Rebase onto upstream tags within a week** of upstream stable releases
+- **Test in our own production** before tagging any branch as stable
+- **Backport security fixes** from upstream as they land
+- **Open issues against this fork** for problems you encounter — we read them
+- **Accept pull requests** if they improve the fork without diverging from our production needs
+
+We do **not**:
+
+- Provide free email support (post issues on this repo or on the [upstream forum](https://discourse.mailinabox.email/))
+- Promise feature parity with upstream's release cadence — we follow, we don't lead
+- Maintain fork-only documentation in multiple languages — English only, except for `UPGRADE_PLAN_*.md` files which are operational notes for our team
+
+---
+
+## Contributing
+
+Pull requests are welcome, especially:
+
+- Tests of the 22.04 → 24.04 upgrade procedure on hypervisors other than Hyper-V (VMware, KVM, Proxmox, bare-metal). Open an issue with your result whether it succeeds or fails.
+- Tests of rspamd on configurations other than Romanian-context (different sender locales, different DMARC policies). Help us learn where the brand-impersonation rules need adjustment.
+- Bug fixes that don't add complexity for the maintenance burden.
+
+Avoid:
+
+- Features unrelated to operating an actual production mail server
+- Things that would require us to maintain divergent code paths long-term
+
+---
+
+## Acknowledgements
+
+- **[Joshua Tauberer (@JoshData)](https://github.com/JoshData)** and the upstream contributors for creating and maintaining Mail-in-a-Box. None of this fork would exist without them. The fork's purpose is to extend, not replace, their work.
+- The **rspamd** team ([rspamd.com](https://rspamd.com)) for an excellent modern spam filter.
+- The **Mail-in-a-Box community forum** ([discourse.mailinabox.email](https://discourse.mailinabox.email/)) where many of the integration ideas in this fork were first discussed.
+
+---
+
+## Maintained by
+
+[Geseidl IT Solutions](https://geseidl.ro/servicii-it), part of [Geseidl Consulting Group](https://geseidl.ro). We are an accounting and IT services group based in Bucharest, Romania, running our own infrastructure for ~70 employees and ~80 client companies. This fork exists because we needed it for ourselves; we publish it because someone else might too.
+
+Contact: open an issue on this repo. For commercial support of MiaB deployments based on this fork, [Geseidl IT Solutions](https://geseidl.ro/servicii-it) offers paid engagements.
+
+---
+
+# Mail-in-a-Box (upstream README, for reference)
 
 By [@JoshData](https://github.com/JoshData) and [contributors](https://github.com/mail-in-a-box/mailinabox/graphs/contributors).
-
-<a href="https://geseidl.ro/servicii-it"><img src="https://geseidl.ro/assets/icons/logo-green.png" alt="Geseidl Consulting Group" height="40"></a>
-
-**Geseidl Edition** — Production mail server fork by [Geseidl IT Solutions](https://geseidl.ro/servicii-it) with rspamd integration, NAT support, external DNS compatibility, and mail archive capabilities. Used in production at [Geseidl Consulting Group](https://geseidl.ro).
-
-> ## 🎉 NEW 2026-04-30: In-place Ubuntu 22.04 → 24.04 upgrade VALIDATED in production!
->
-> We performed an in-place upgrade of a production MiaB server (mail.geseidl.ro, 70+ users, 424GB user-data, 4 hosted domains) to **Ubuntu 24.04 LTS + kernel 6.8** with **only 1h12min downtime**, no mail loss and no reinstall.
->
-> 📖 **Step-by-step guide**: [`UPGRADE_22.04_TO_24.04_GUIDE.md`](UPGRADE_22.04_TO_24.04_GUIDE.md) — includes rollback plan, common troubleshooting, lessons learned, with fixes for every issue we hit.
->
-> 🛠️ **Automation scripts**:
-> - [`setup-helpers/backup-mail-configs.sh`](setup-helpers/backup-mail-configs.sh) — tarball backup of all critical configs
-> - [`setup-helpers/upgrade-2204-to-2404.sh`](setup-helpers/upgrade-2204-to-2404.sh) — phased automation (prep + os + miab + verify)
->
-> ⚠️ **This upgrade is NOT officially supported by MiaB upstream** (the preflight check rejects 24.04). Use at your own risk, with VM-level backup ready. Details in the guide.
->
-> 🌿 **Deploy branch**: `geseidl-edition-v75` (rebased on v75 + customs). Stable tag: `geseidl-v75-2026-04-30`.
 
 Mail-in-a-Box helps individuals take back control of their email by defining a one-click, easy-to-deploy SMTP+everything else server: a mail server in a box.
 
@@ -97,7 +264,7 @@ This is a challenge faced by everyone who runs their own mail server, with or wi
 Contributing and Development
 ----------------------------
 
-Mail-in-a-Box is an open source project. Your contributions and pull requests are welcome. See [CONTRIBUTING](CONTRIBUTING.md) to get started. 
+Mail-in-a-Box is an open source project. Your contributions and pull requests are welcome. See [CONTRIBUTING](CONTRIBUTING.md) to get started.
 
 
 The Acknowledgements
@@ -124,7 +291,7 @@ The History
     <img src="https://geseidl.ro/assets/icons/makeitcount-amprenta-gold.png" alt="makeitcount" height="60">
   </a>
   <br>
-  <sub><em>Open source is how we make the world a little better, from our corner.</em></sub>
+  <sub><em>We believe great tools should be shared. Every contribution counts.</em></sub>
   <br>
   <sub><a href="https://make-it-count.ro">make-it-count.ro</a></sub>
 </p>
