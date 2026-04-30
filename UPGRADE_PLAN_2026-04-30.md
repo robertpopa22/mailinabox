@@ -158,10 +158,7 @@ NU în scope:
    git push origin geseidl-edition-v75
    ```
 
-4. **Veeam B&R**: trigger backup ad-hoc full pe job MAIL02
-   - Verifica via Invoke-Command pe S01
-   - Astept finalizare (~30-60 min pt 800GB VM)
-   - Confirma success log
+4. ~~Veeam B&R live backup~~ — **MUTAT in Faza 2 post-shutdown** (user instructiune 2026-04-30: backup doar dupa shutdown pentru consistent state, nu pe VM running)
 
 5. **Backup local fisiere critice de pe MAIL02** (rsync / scp):
    - `/etc/postfix/`
@@ -207,9 +204,11 @@ NU în scope:
     }
     ```
 
-12. **Veeam B&R ad-hoc backup** (al doilea, post-shutdown = consistent state):
-    Trigger via Veeam GUI sau PS Direct pe S01.
-    Astept finalizare (~20-30 min on shutdown VM).
+12. **Veeam B&R ad-hoc full backup** (UNICUL, post-shutdown = consistent state):
+    PS Direct via S00 → S01 (PS7 endpoint required pt v13 — vezi `feedback_veeam_ps7_remoting.md`).
+    Trigger `Start-VBRJob` sau `Start-VBRBackupJob` pe job MAIL02.
+    Astept finalizare (~30-45 min on stopped VM).
+    **Decision gate G2**: daca Veeam fail → STOP, retry. Doar Hyper-V checkpoint NU e suficient (single point of failure pe S00 disk).
 
 13. **Boot VM** pentru upgrade.
 
@@ -431,9 +430,23 @@ git rebase v75
 
 ---
 
-## Status
+## Status (live)
 
-- [x] Rebase test (Gate G1) — PASSED 0 conflicts
+- [x] **Faza 0** complet: rebase fork @ `geseidl-edition-v75` (9/9 commits 0 conflicts) + configs backup tarball 39M (185 files) → branch `backup/mail02-pre-upgrade-2026-04-30`
+- [x] **Faza 1** complet: mail queue empty, apt-daily.timer disabled
+- [x] **Faza 2** in progress:
+  - shutdown VM 14:06 EEST ✅
+  - Hyper-V checkpoint `pre-2404-v75-upgrade-2026-04-30-1406` ✅
+  - VM booted (Veeam auto-boot) ✅
+  - Veeam B&R full backup running PARALEL pe checkpoint snapshot (PS7 7.4.13 installat pe S01, endpoint registered)
+- [x] **Faza 3** in progress (PARALEL cu Veeam):
+  - 14:39 EEST: `mail02_release_upgrade.sh` background pe MAIL02
+  - apt upgrade pre-clean DONE
+  - update-manager-core installing
+  - do-release-upgrade jammy→noble in progress
+- [ ] **Faza 4**: deploy fork v75 + setup/start.sh
+- [ ] **Faza 5**: verify SMTP/IMAP/forwards/DKIM/spam
+- [ ] Cleanup
 - [ ] Plan reviewed by user
 - [ ] Pre-requisites complete
 - [ ] Maintenance window scheduled: TBD
