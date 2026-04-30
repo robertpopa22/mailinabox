@@ -7,6 +7,20 @@ By [@JoshData](https://github.com/JoshData) and [contributors](https://github.co
 
 **Geseidl Edition** — Production mail server fork by [Geseidl IT Solutions](https://geseidl.ro/servicii-it) with rspamd integration, NAT support, external DNS compatibility, and mail archive capabilities. Used in production at [Geseidl Consulting Group](https://geseidl.ro).
 
+> ## 🎉 NEW 2026-04-30: In-place Ubuntu 22.04 → 24.04 upgrade VALIDATED in production!
+>
+> We performed an in-place upgrade of a production MiaB server (mail.geseidl.ro, 70+ users, 424GB user-data, 4 hosted domains) to **Ubuntu 24.04 LTS + kernel 6.8** with **only 1h12min downtime**, no mail loss and no reinstall.
+>
+> 📖 **Step-by-step guide**: [`UPGRADE_22.04_TO_24.04_GUIDE.md`](UPGRADE_22.04_TO_24.04_GUIDE.md) — includes rollback plan, common troubleshooting, lessons learned, with fixes for every issue we hit.
+>
+> 🛠️ **Automation scripts**:
+> - [`setup-helpers/backup-mail-configs.sh`](setup-helpers/backup-mail-configs.sh) — tarball backup of all critical configs
+> - [`setup-helpers/upgrade-2204-to-2404.sh`](setup-helpers/upgrade-2204-to-2404.sh) — phased automation (prep + os + miab + verify)
+>
+> ⚠️ **This upgrade is NOT officially supported by MiaB upstream** (the preflight check rejects 24.04). Use at your own risk, with VM-level backup ready. Details in the guide.
+>
+> 🌿 **Deploy branch**: `geseidl-edition-v75` (rebased on v75 + customs). Stable tag: `geseidl-v75-2026-04-30`.
+
 Mail-in-a-Box helps individuals take back control of their email by defining a one-click, easy-to-deploy SMTP+everything else server: a mail server in a box.
 
 **Please see [https://mailinabox.email](https://mailinabox.email) for the project's website and setup guide!**

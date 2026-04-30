@@ -431,16 +431,36 @@ git rebase v75
 
 ---
 
-## Status
+## Status FINAL — ✅ SUCCESS 2026-04-30
+
+| Faza | Start | End | Status |
+|---|---|---|---|
+| 0 Pregatire | 13:35 | 13:55 | ✅ rebase 9/9 commits 0 conflicts + tarball backup 39MB |
+| 1 Pre-shutdown | 14:04 | 14:05 | ✅ queue empty, apt-daily stopped |
+| 2 Snapshot | 14:06 | 14:10 | ✅ shutdown + Hyper-V checkpoint + Veeam start (parallel pe checkpoint) |
+| 3 do-release-upgrade | 14:39 | 15:06 | ✅ Ubuntu 24.04, kernel 6.8.0-110, reboot OK |
+| 4 Deploy v75 | 15:15 | 15:21 | ⚠ setup/start.sh REFUSED (preflight 22.04 only); manual fix venv + pip deps + restart mailinabox.service |
+| 5 Verify | 15:21 | 15:21 | ✅ Mail INBOUND + OUTBOUND (TLS 1.3) + IMAP login + admin panel HTTP 200 + DKIM signing + Sieve filtering |
+
+**Downtime mail real**: 1h12min (14:06 shutdown → 15:18 prima livrare test confirmata).
+**Sub timebox 2h** ✅.
+
+Probleme intalnite + rezolvate (toate documentate in [`UPGRADE_22.04_TO_24.04_GUIDE.md`](UPGRADE_22.04_TO_24.04_GUIDE.md)):
+1. UFW `LIMIT 22/tcp` + fail2ban → ban IP admin la polling rapid
+2. SSH service flap intre `dpkg --configure --pending` invocations
+3. /tmp tmpfs cleared post-reboot (logs pierduti)
+4. MiaB v75 setup/preflight.sh refuza Ubuntu 24.04
+5. Python venv (3.10 jammy → 3.12 noble) ramane stale, gunicorn ModuleNotFoundError
+6. MiaB nu pastreaza `requirements.txt` standard — deps embedded in `setup/management.sh`
+7. `cryptography==37.0.2` pin vechi (2022) nu compileaza pe Python 3.12 — folosit latest
+8. PHP service e `php8.0-fpm` (Sury repo provides on noble), NU `php8.3-fpm`
+9. user-data UID 1000 (jammy) → 1001 (noble) — DKIM warning (functional)
 
 - [x] Rebase test (Gate G1) — PASSED 0 conflicts
-- [ ] Plan reviewed by user
-- [ ] Pre-requisites complete
-- [ ] Maintenance window scheduled: TBD
-- [ ] Faza 0 done
-- [ ] Faza 1-2 done
-- [ ] Faza 3 done
-- [ ] Faza 4 done
-- [ ] Faza 5 verified
-- [ ] Faza 6 cleanup
-- [ ] Final commit + log
+- [x] Faza 0 done
+- [x] Faza 1-2 done
+- [x] Faza 3 done
+- [x] Faza 4 done (cu adjustments manual — vezi GUIDE EN)
+- [x] Faza 5 verified
+- [ ] Faza 6 cleanup (sterge checkpoint Hyper-V dupa 24h soak)
+- [x] Final commit + log
