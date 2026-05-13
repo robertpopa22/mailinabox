@@ -1,7 +1,7 @@
 [Unit]
-Description=Email FTS5 indexer (incremental, mtime-based)
-After=dovecot.service
-Wants=dovecot.service
+Description=Email indexer (incremental, mtime-based) → PostgreSQL
+After=dovecot.service postgresql.service
+Wants=dovecot.service postgresql.service
 
 [Service]
 Type=oneshot
@@ -9,11 +9,9 @@ User=root
 Group=root
 Nice=10
 IOSchedulingClass=idle
+EnvironmentFile=/etc/mailinabox/postgres.env
+Environment=PG_DSN=${PG_DSN_INDEXER}
 ExecStart=/usr/bin/flock -w 300 /var/lock/email-indexer.lock /usr/bin/python3 /opt/email-indexer/indexer.py --incremental
 StandardOutput=journal
 StandardError=journal
 TimeoutStartSec=900
-# After each run, sync DB ownership so it's readable for rsync user
-ExecStartPost=/bin/chmod 644 /var/lib/email-indexer/live.db
-ExecStartPost=-/bin/chmod 644 /var/lib/email-indexer/live.db-wal
-ExecStartPost=-/bin/chmod 644 /var/lib/email-indexer/live.db-shm

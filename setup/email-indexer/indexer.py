@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Email indexer for Mail-in-a-Box (Dovecot maildir) → SQLite FTS5.
+Email indexer for Mail-in-a-Box (Dovecot maildir) → PostgreSQL FTS (tsvector).
 
 Modes:
   --incremental   Scan only files with mtime > last_run_ts (default, ~10min cron)
   --full          Scan all files + reconcile deletions (nightly)
   --stats         Print index statistics
-  --search QUERY  Quick FTS5 query test
+  --search QUERY  Quick FTS query test (websearch_to_tsquery)
 
 Maildir layout (Mail-in-a-Box / Dovecot):
   /home/user-data/mail/mailboxes/<domain>/<user>/{cur,new,tmp}/
@@ -15,7 +15,20 @@ Maildir layout (Mail-in-a-Box / Dovecot):
 Each file = one RFC822 message. Filename includes Dovecot UID + flags
 (e.g. "1234.M567P890.host:2,S"). Flags change file rename → mtime updates.
 
-Output: SQLite FTS5 DB at /var/lib/email-indexer/live.db (configurable via env).
+Output: PostgreSQL database `emails` on MAIL02 (10.0.1.89:5432).
+DSN read from env PG_DSN, or fallback to /etc/mailinabox/postgres.env
+(line `PG_DSN_INDEXER=...`).
+
+Schema (managed by setup/postgres/schema.sql):
+  emails(id, source ENUM('live','archive'), message_id, folder, file_path,
+         date_str, date_ts TIMESTAMPTZ, from_addr, to_addr, cc_addr,
+         subject, body_snippet, size_bytes, mtime, indexed_at,
+         body_tsv GENERATED ALWAYS AS (...) STORED)
+  UNIQUE (source, file_path)
+  indexer_meta(source, key, value) PK(source, key)
+
+This script ALWAYS writes source='live' (Dovecot live maildir on MAIL02).
+The archive indexer on GES051WS writes source='archive'.
 """
 from __future__ import annotations
 
@@ -26,21 +39,25 @@ import logging
 import multiprocessing
 import os
 import re
-import sqlite3
 import sys
 import time
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime, getaddresses
 from pathlib import Path
 
+import psycopg
+from psycopg import sql
+
 DEFAULT_MAILBOX_ROOT = Path(os.environ.get("MAILBOX_ROOT", "/home/user-data/mail/mailboxes"))
-DEFAULT_DB_PATH = Path(os.environ.get("EMAIL_INDEX_DB", "/var/lib/email-indexer/live.db"))
+DEFAULT_PG_ENV_FILE = Path(os.environ.get("PG_ENV_FILE", "/etc/mailinabox/postgres.env"))
+SOURCE = "live"  # this indexer always targets the live Dovecot maildir on MAIL02
 
 # Skip these mailbox subfolders (huge or noisy, low value to index)
 SKIP_FOLDERS = {".Trash", ".Spam", ".Junk"}
 
 MAX_BODY_LEN = 8000
 MAX_FILE_BYTES = 5 * 1024 * 1024  # skip files > 5 MB (rare, mostly mailing lists with big attachments)
-COMMIT_BATCH = 2000
+COMMIT_BATCH = 500  # rows per executemany batch (PG round-trip)
 
 # Worker count: cap at 80% of cores to leave headroom for Dovecot/Postfix
 DEFAULT_WORKERS = max(2, int((os.cpu_count() or 4) * 0.8))
@@ -49,94 +66,109 @@ WORKER_BATCH_SIZE = 200
 
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 WS_RE = re.compile(r"\s+")
+NUL_RE = re.compile(r"\x00")
 
 log = logging.getLogger("email_indexer")
 
 
-def init_db(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), isolation_level="DEFERRED", timeout=120.0)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute("PRAGMA busy_timeout=120000")  # 120s wait for locks
-    conn.execute("PRAGMA cache_size=-65536")  # 64 MB
-    conn.execute("PRAGMA mmap_size=268435456")  # 256 MB
+# ----- DSN / connection helpers -----------------------------------------------
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS emails (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            message_id TEXT,
-            folder TEXT NOT NULL,
-            file_path TEXT NOT NULL UNIQUE,
-            date_str TEXT,
-            date_ts REAL,
-            from_addr TEXT,
-            to_addr TEXT,
-            cc_addr TEXT,
-            subject TEXT,
-            body_snippet TEXT,
-            size_bytes INTEGER,
-            mtime REAL,
-            indexed_at REAL NOT NULL
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_emails_message_id ON emails(message_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_emails_folder ON emails(folder)")
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_emails_date_ts ON emails(date_ts)")
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_emails_mtime ON emails(mtime)")
+def _read_env_file(path: Path) -> dict[str, str]:
+    """Parse a shell-style env file (KEY=VALUE per line). Strips quotes."""
+    out: dict[str, str] = {}
+    if not path.exists():
+        return out
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("export "):
+                    line = line[len("export "):]
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                v = v.strip()
+                if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                    v = v[1:-1]
+                out[k.strip()] = v
+    except OSError:
+        pass
+    return out
 
-    conn.execute("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS emails_fts USING fts5(
-            subject, from_addr, to_addr, body_text, message_id,
-            content='emails',
-            content_rowid='id',
-            tokenize='unicode61 remove_diacritics 2'
-        )
-    """)
-    # Triggers keep FTS in sync
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS emails_ai AFTER INSERT ON emails BEGIN
-            INSERT INTO emails_fts(rowid, subject, from_addr, to_addr, body_text, message_id)
-            VALUES (new.id, new.subject, new.from_addr, new.to_addr, new.body_snippet, new.message_id);
-        END
-    """)
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS emails_ad AFTER DELETE ON emails BEGIN
-            INSERT INTO emails_fts(emails_fts, rowid, subject, from_addr, to_addr, body_text, message_id)
-            VALUES('delete', old.id, old.subject, old.from_addr, old.to_addr, old.body_snippet, old.message_id);
-        END
-    """)
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS emails_au AFTER UPDATE ON emails BEGIN
-            INSERT INTO emails_fts(emails_fts, rowid, subject, from_addr, to_addr, body_text, message_id)
-            VALUES('delete', old.id, old.subject, old.from_addr, old.to_addr, old.body_snippet, old.message_id);
-            INSERT INTO emails_fts(rowid, subject, from_addr, to_addr, body_text, message_id)
-            VALUES (new.id, new.subject, new.from_addr, new.to_addr, new.body_snippet, new.message_id);
-        END
-    """)
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS meta (
-            key TEXT PRIMARY KEY,
-            value TEXT
+def resolve_dsn(env_file: Path = DEFAULT_PG_ENV_FILE) -> str:
+    """Return PostgreSQL DSN from env or /etc/mailinabox/postgres.env."""
+    dsn = os.environ.get("PG_DSN", "").strip()
+    if dsn:
+        return dsn
+    env = _read_env_file(env_file)
+    dsn = env.get("PG_DSN_INDEXER") or env.get("PG_DSN") or ""
+    if not dsn:
+        raise RuntimeError(
+            f"No PG_DSN in env and {env_file} missing/empty. "
+            "Expected PG_DSN_INDEXER=... in the env file."
         )
-    """)
-    conn.commit()
+    return dsn
+
+
+def get_pg_conn(dsn: str | None = None) -> psycopg.Connection:
+    """Open a psycopg connection. Application_name eases pg_stat_activity triage."""
+    if dsn is None:
+        dsn = resolve_dsn()
+    conn = psycopg.connect(
+        dsn,
+        autocommit=False,
+        application_name="email-indexer-mail02",
+    )
+    # Smoke test
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1")
+        cur.fetchone()
     return conn
 
 
-def get_meta(conn: sqlite3.Connection, key: str, default: str = "") -> str:
-    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+# ----- text sanitation --------------------------------------------------------
+
+def _clean(value: str) -> str:
+    """Strip NUL bytes (illegal in PG TEXT) and normalize whitespace edges.
+
+    NULs occur in malformed RFC822 bodies (e.g. binary chunks misdeclared as
+    text/plain). PostgreSQL rejects them with `invalid byte sequence`.
+    """
+    if not value:
+        return ""
+    if "\x00" in value:
+        value = NUL_RE.sub("", value)
+    return value
+
+
+# ----- indexer_meta accessors -------------------------------------------------
+
+def get_meta(conn: psycopg.Connection, key: str, default: str = "") -> str:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT value FROM indexer_meta WHERE source = %s AND key = %s",
+            (SOURCE, key),
+        )
+        row = cur.fetchone()
     return row[0] if row else default
 
 
-def set_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
-    conn.execute(
-        "INSERT INTO meta(key, value) VALUES(?, ?) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        (key, value),
-    )
+def set_meta(conn: psycopg.Connection, key: str, value: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO indexer_meta (source, key, value)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (source, key) DO UPDATE SET value = EXCLUDED.value
+            """,
+            (SOURCE, key, value),
+        )
 
+
+# ----- maildir traversal ------------------------------------------------------
 
 def derive_folder_label(maildir_path: Path, root: Path) -> str:
     """Convert /…/geseidl.ro/robert.popa/.Archive/cur → geseidl.ro/robert.popa/Archive."""
@@ -199,6 +231,8 @@ def walk_maildir_files(root: Path, since_mtime: float = 0.0):
                     except (PermissionError, FileNotFoundError):
                         continue
 
+
+# ----- RFC822 parsing ---------------------------------------------------------
 
 def _decode_header(val) -> str:
     if not val:
@@ -291,7 +325,7 @@ def parse_email_file(fpath: Path) -> dict | None:
         return None
     try:
         date_str = _safe_header(msg, "Date")
-        date_ts = 0.0
+        date_ts: float = 0.0
         if date_str:
             try:
                 dt = parsedate_to_datetime(date_str)
@@ -304,64 +338,113 @@ def parse_email_file(fpath: Path) -> dict | None:
         except Exception:
             body = ""
         return {
-            "message_id": _safe_header(msg, "Message-ID").strip(),
-            "date_str": date_str,
-            "date_ts": date_ts,
-            "from_addr": _safe_addrs(msg, "From"),
-            "to_addr": _safe_addrs(msg, "To"),
-            "cc_addr": _safe_addrs(msg, "Cc"),
-            "subject": _safe_header(msg, "Subject").strip(),
-            "body_snippet": body,
+            "message_id": _clean(_safe_header(msg, "Message-ID").strip()),
+            "date_str": _clean(date_str),
+            "date_ts": date_ts,  # float unix-epoch; converted to TIMESTAMPTZ at upsert
+            "from_addr": _clean(_safe_addrs(msg, "From")),
+            "to_addr": _clean(_safe_addrs(msg, "To")),
+            "cc_addr": _clean(_safe_addrs(msg, "Cc")),
+            "subject": _clean(_safe_header(msg, "Subject").strip()),
+            "body_snippet": _clean(body),
             "size_bytes": size,
         }
     except Exception:
         return None
 
 
-def upsert_email(conn: sqlite3.Connection, file_path: str, folder: str, mtime: float, parsed: dict) -> None:
-    now = time.time()
-    conn.execute(
-        """
-        INSERT INTO emails(
-            message_id, folder, file_path, date_str, date_ts,
-            from_addr, to_addr, cc_addr, subject, body_snippet,
-            size_bytes, mtime, indexed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(file_path) DO UPDATE SET
-            message_id=excluded.message_id,
-            folder=excluded.folder,
-            date_str=excluded.date_str,
-            date_ts=excluded.date_ts,
-            from_addr=excluded.from_addr,
-            to_addr=excluded.to_addr,
-            cc_addr=excluded.cc_addr,
-            subject=excluded.subject,
-            body_snippet=excluded.body_snippet,
-            size_bytes=excluded.size_bytes,
-            mtime=excluded.mtime,
-            indexed_at=excluded.indexed_at
-        """,
-        (
-            parsed["message_id"], folder, file_path,
-            parsed["date_str"], parsed["date_ts"],
-            parsed["from_addr"], parsed["to_addr"], parsed["cc_addr"],
-            parsed["subject"], parsed["body_snippet"],
-            parsed["size_bytes"], mtime, now,
-        ),
+# ----- upsert -----------------------------------------------------------------
+
+INSERT_SQL = """
+INSERT INTO emails (
+    source, message_id, folder, file_path,
+    date_str, date_ts, from_addr, to_addr, cc_addr,
+    subject, body_snippet, size_bytes, mtime, indexed_at
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (source, file_path) DO UPDATE SET
+    message_id  = EXCLUDED.message_id,
+    folder      = EXCLUDED.folder,
+    date_str    = EXCLUDED.date_str,
+    date_ts     = EXCLUDED.date_ts,
+    from_addr   = EXCLUDED.from_addr,
+    to_addr     = EXCLUDED.to_addr,
+    cc_addr     = EXCLUDED.cc_addr,
+    subject     = EXCLUDED.subject,
+    body_snippet= EXCLUDED.body_snippet,
+    size_bytes  = EXCLUDED.size_bytes,
+    mtime       = EXCLUDED.mtime,
+    indexed_at  = EXCLUDED.indexed_at
+"""
+
+
+def _ts_to_dt(ts: float | None) -> datetime | None:
+    """SQLite stored UNIX epoch (float). PG wants TIMESTAMPTZ. NULL for unparsable."""
+    if not ts or ts <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _row_tuple(file_path: str, folder: str, mtime: float, parsed: dict, now: float) -> tuple:
+    return (
+        SOURCE,
+        parsed["message_id"] or None,
+        _clean(folder),
+        _clean(file_path),
+        parsed["date_str"] or None,
+        _ts_to_dt(parsed["date_ts"]),
+        parsed["from_addr"] or None,
+        parsed["to_addr"] or None,
+        parsed["cc_addr"] or None,
+        parsed["subject"] or None,
+        parsed["body_snippet"] or None,
+        int(parsed["size_bytes"]),
+        _ts_to_dt(mtime),
+        _ts_to_dt(now),
     )
 
 
-def reconcile_deletions(conn: sqlite3.Connection, root: Path) -> int:
+def flush_batch(conn: psycopg.Connection, rows: list[tuple]) -> int:
+    """executemany INSERT…ON CONFLICT for a row batch. Commits on success."""
+    if not rows:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(INSERT_SQL, rows)
+    conn.commit()
+    return len(rows)
+
+
+# ----- reconcile (full mode) --------------------------------------------------
+
+def reconcile_deletions(conn: psycopg.Connection, root: Path) -> int:
     """Remove rows whose file_path no longer exists. Only safe in --full mode."""
     deleted = 0
-    cur = conn.execute("SELECT id, file_path FROM emails")
-    rows = cur.fetchall()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, file_path FROM emails WHERE source = %s",
+            (SOURCE,),
+        )
+        rows = cur.fetchall()
+    stale_ids: list[int] = []
     for row_id, fpath in rows:
         if not Path(fpath).exists():
-            conn.execute("DELETE FROM emails WHERE id = ?", (row_id,))
-            deleted += 1
+            stale_ids.append(row_id)
+    if stale_ids:
+        # Delete in chunks to avoid massive single statements
+        with conn.cursor() as cur:
+            for i in range(0, len(stale_ids), 5000):
+                chunk = stale_ids[i:i + 5000]
+                cur.execute(
+                    "DELETE FROM emails WHERE source = %s AND id = ANY(%s)",
+                    (SOURCE, chunk),
+                )
+                deleted += cur.rowcount or 0
+        conn.commit()
     return deleted
 
+
+# ----- multiprocessing parse workers ------------------------------------------
 
 def _worker_parse_batch(tasks: list[tuple[str, float, str]]) -> list[tuple[str, float, str, dict | None]]:
     """Worker: parse a batch of files. Returns list of (path, mtime, folder, parsed_or_None).
@@ -391,146 +474,197 @@ def _chunked(iterable, size: int):
         yield buf
 
 
-def run_indexer(mode: str, db_path: Path, mailbox_root: Path, workers: int = DEFAULT_WORKERS) -> dict:
+# ----- main run ---------------------------------------------------------------
+
+def run_indexer(mode: str, mailbox_root: Path, workers: int = DEFAULT_WORKERS) -> dict:
     t0 = time.time()
-    conn = init_db(db_path)
-    last_run = float(get_meta(conn, "last_incremental_ts", "0") or 0)
-    since = 0.0 if mode == "full" else max(0.0, last_run - 60.0)  # 60s overlap
-    log.info(
-        "Mode=%s | root=%s | db=%s | since_mtime=%.0f | workers=%d | batch=%d",
-        mode, mailbox_root, db_path, since, workers, WORKER_BATCH_SIZE,
-    )
+    conn = get_pg_conn()
+    try:
+        last_run = float(get_meta(conn, "last_incremental_ts", "0") or 0)
+        since = 0.0 if mode == "full" else max(0.0, last_run - 60.0)  # 60s overlap
+        log.info(
+            "Mode=%s | root=%s | since_mtime=%.0f | workers=%d | batch=%d | source=%s",
+            mode, mailbox_root, since, workers, WORKER_BATCH_SIZE, SOURCE,
+        )
 
-    processed = 0
-    skipped = 0
-    pending = 0
+        processed = 0
+        skipped = 0
+        pending_rows: list[tuple] = []
 
-    # Tasks streamed from walk → string paths (pickle-friendly for workers)
-    def task_iter():
-        for fpath, mtime, folder in walk_maildir_files(mailbox_root, since_mtime=since):
-            yield (str(fpath), mtime, folder)
+        # Tasks streamed from walk → string paths (pickle-friendly for workers)
+        def task_iter():
+            for fpath, mtime, folder in walk_maildir_files(mailbox_root, since_mtime=since):
+                yield (str(fpath), mtime, folder)
 
-    if workers <= 1:
-        # Fallback single-threaded path
-        for fpath_str, mtime, folder in task_iter():
-            try:
-                parsed = parse_email_file(Path(fpath_str))
-                if parsed is None:
-                    skipped += 1
-                    continue
-                upsert_email(conn, fpath_str, folder, mtime, parsed)
-            except Exception as e:
-                log.warning("Skipping %s: %s", fpath_str, e)
-                skipped += 1
-                continue
-            processed += 1
-            pending += 1
-            if pending >= COMMIT_BATCH:
-                conn.commit()
-                pending = 0
-            if processed % 10000 == 0:
-                log.info("Progress: %d processed, %d skipped (%.1fs)", processed, skipped, time.time() - t0)
-    else:
-        # Multiprocessing path — workers parse files (CPU-bound), main writes DB (I/O serialized)
-        ctx = multiprocessing.get_context("fork")
-        with ctx.Pool(processes=workers) as pool:
-            batches = _chunked(task_iter(), WORKER_BATCH_SIZE)
-            for batch_result in pool.imap_unordered(_worker_parse_batch, batches):
-                for fpath_str, mtime, folder, parsed in batch_result:
+        if workers <= 1:
+            # Fallback single-threaded path
+            for fpath_str, mtime, folder in task_iter():
+                try:
+                    parsed = parse_email_file(Path(fpath_str))
                     if parsed is None:
                         skipped += 1
                         continue
+                    pending_rows.append(_row_tuple(fpath_str, folder, mtime, parsed, time.time()))
+                except Exception as e:
+                    log.warning("Skipping %s: %s", fpath_str, e)
+                    skipped += 1
+                    continue
+                processed += 1
+                if len(pending_rows) >= COMMIT_BATCH:
+                    flush_batch(conn, pending_rows)
+                    pending_rows = []
+                if processed % 10000 == 0:
+                    log.info("Progress: %d processed, %d skipped (%.1fs)", processed, skipped, time.time() - t0)
+        else:
+            # Multiprocessing path — workers parse files (CPU-bound), main writes DB (I/O serialized)
+            ctx = multiprocessing.get_context("fork")
+            with ctx.Pool(processes=workers) as pool:
+                batches = _chunked(task_iter(), WORKER_BATCH_SIZE)
+                for batch_result in pool.imap_unordered(_worker_parse_batch, batches):
+                    for fpath_str, mtime, folder, parsed in batch_result:
+                        if parsed is None:
+                            skipped += 1
+                            continue
+                        try:
+                            pending_rows.append(_row_tuple(fpath_str, folder, mtime, parsed, time.time()))
+                        except Exception as e:
+                            log.warning("Row build failed for %s: %s", fpath_str, e)
+                            skipped += 1
+                            continue
+                        processed += 1
+                    if len(pending_rows) >= COMMIT_BATCH:
+                        try:
+                            flush_batch(conn, pending_rows)
+                        except Exception as e:
+                            # On batch failure, retry rows one-by-one to isolate the bad one
+                            log.warning("Batch insert failed (%s); retrying individually", e)
+                            conn.rollback()
+                            for row in pending_rows:
+                                try:
+                                    with conn.cursor() as cur:
+                                        cur.execute(INSERT_SQL, row)
+                                    conn.commit()
+                                except Exception as e2:
+                                    log.warning("Row insert failed (file_path=%s): %s", row[3], e2)
+                                    conn.rollback()
+                                    skipped += 1
+                                    processed = max(0, processed - 1)
+                        pending_rows = []
+                    if processed and (processed // 10000) != ((processed - len(batch_result)) // 10000):
+                        rate = processed / max(0.001, time.time() - t0)
+                        log.info(
+                            "Progress: %d processed, %d skipped (%.1fs, %.0f msg/s)",
+                            processed, skipped, time.time() - t0, rate,
+                        )
+
+        if pending_rows:
+            try:
+                flush_batch(conn, pending_rows)
+            except Exception as e:
+                log.warning("Final batch failed (%s); retrying individually", e)
+                conn.rollback()
+                for row in pending_rows:
                     try:
-                        upsert_email(conn, fpath_str, folder, mtime, parsed)
-                    except Exception as e:
-                        log.warning("Upsert failed for %s: %s", fpath_str, e)
+                        with conn.cursor() as cur:
+                            cur.execute(INSERT_SQL, row)
+                        conn.commit()
+                    except Exception as e2:
+                        log.warning("Row insert failed (file_path=%s): %s", row[3], e2)
+                        conn.rollback()
                         skipped += 1
-                        continue
-                    processed += 1
-                    pending += 1
-                if pending >= COMMIT_BATCH:
-                    conn.commit()
-                    pending = 0
-                if processed and (processed // 10000) != ((processed - len(batch_result)) // 10000):
-                    rate = processed / max(0.001, time.time() - t0)
-                    log.info(
-                        "Progress: %d processed, %d skipped (%.1fs, %.0f msg/s)",
-                        processed, skipped, time.time() - t0, rate,
-                    )
 
-    if pending:
+        deleted = 0
+        if mode == "full":
+            log.info("Reconciling deletions...")
+            deleted = reconcile_deletions(conn, mailbox_root)
+
+        now = time.time()
+        set_meta(conn, "last_incremental_ts" if mode == "incremental" else "last_full_ts", str(now))
+        if mode == "full":
+            set_meta(conn, "last_incremental_ts", str(now))  # full subsumes incremental
+        set_meta(conn, "last_mode", mode)
+        set_meta(conn, "last_duration_s", str(round(now - t0, 2)))
         conn.commit()
 
-    deleted = 0
-    if mode == "full":
-        log.info("Reconciling deletions…")
-        deleted = reconcile_deletions(conn, mailbox_root)
-        conn.commit()
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM emails WHERE source = %s", (SOURCE,))
+            total = cur.fetchone()[0]
 
-    now = time.time()
-    set_meta(conn, "last_incremental_ts" if mode == "incremental" else "last_full_ts", str(now))
-    if mode == "full":
-        set_meta(conn, "last_incremental_ts", str(now))  # full subsumes incremental
-    set_meta(conn, "last_mode", mode)
-    set_meta(conn, "last_duration_s", str(round(now - t0, 2)))
-    conn.commit()
+        stats = {
+            "mode": mode,
+            "source": SOURCE,
+            "processed": processed,
+            "skipped": skipped,
+            "deleted": deleted,
+            "total_indexed": total,
+            "duration_s": round(now - t0, 2),
+        }
+        log.info("Done: %s", stats)
+        return stats
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
-    total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
-    # Checkpoint WAL into main DB so the file is consistent for rsync/scp
+
+# ----- CLI commands -----------------------------------------------------------
+
+def cmd_stats() -> None:
+    conn = get_pg_conn()
     try:
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    except sqlite3.OperationalError:
-        pass
-    conn.close()
-
-    stats = {
-        "mode": mode,
-        "processed": processed,
-        "skipped": skipped,
-        "deleted": deleted,
-        "total_indexed": total,
-        "duration_s": round(now - t0, 2),
-    }
-    log.info("Done: %s", stats)
-    return stats
-
-
-def cmd_stats(db_path: Path) -> None:
-    if not db_path.exists():
-        print(f"DB not initialized: {db_path}")
-        return
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
-    by_folder = conn.execute(
-        "SELECT folder, COUNT(*) FROM emails GROUP BY folder ORDER BY 2 DESC LIMIT 20"
-    ).fetchall()
-    last_inc = conn.execute("SELECT value FROM meta WHERE key='last_incremental_ts'").fetchone()
-    last_full = conn.execute("SELECT value FROM meta WHERE key='last_full_ts'").fetchone()
-    print(f"Total emails: {total}")
-    print(f"Last incremental: {time.ctime(float(last_inc[0])) if last_inc else 'never'}")
-    print(f"Last full:        {time.ctime(float(last_full[0])) if last_full else 'never'}")
-    print("Top 20 folders:")
-    for f, c in by_folder:
-        print(f"  {c:>8}  {f}")
-    conn.close()
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM emails WHERE source = %s", (SOURCE,))
+            total = cur.fetchone()[0]
+            cur.execute(
+                """
+                SELECT folder, COUNT(*) FROM emails
+                WHERE source = %s
+                GROUP BY folder ORDER BY 2 DESC LIMIT 20
+                """,
+                (SOURCE,),
+            )
+            by_folder = cur.fetchall()
+            cur.execute(
+                "SELECT key, value FROM indexer_meta WHERE source = %s",
+                (SOURCE,),
+            )
+            meta = {k: v for k, v in cur.fetchall()}
+        print(f"Source:        {SOURCE}")
+        print(f"Total emails:  {total}")
+        last_inc = meta.get("last_incremental_ts")
+        last_full = meta.get("last_full_ts")
+        print(f"Last incremental: {time.ctime(float(last_inc)) if last_inc else 'never'}")
+        print(f"Last full:        {time.ctime(float(last_full)) if last_full else 'never'}")
+        print(f"Last duration:    {meta.get('last_duration_s', '?')}s ({meta.get('last_mode', '?')})")
+        print("Top 20 folders:")
+        for f, c in by_folder:
+            print(f"  {c:>8}  {f}")
+    finally:
+        conn.close()
 
 
-def cmd_search(db_path: Path, query: str) -> None:
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    rows = conn.execute(
-        """
-        SELECT e.folder, e.date_str, e.from_addr, e.subject, e.message_id
-        FROM emails_fts f
-        JOIN emails e ON e.id = f.rowid
-        WHERE emails_fts MATCH ?
-        ORDER BY e.date_ts DESC
-        LIMIT 20
-        """,
-        (query,),
-    ).fetchall()
-    for folder, date, frm, subj, mid in rows:
-        print(f"{date or '?':30s}  {folder:40s}  {frm[:40]:40s}  {subj[:70]}  {mid}")
-    conn.close()
+def cmd_search(query: str) -> None:
+    """Full-text search via PG tsvector. websearch_to_tsquery supports OR/AND/quotes."""
+    conn = get_pg_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT folder, date_str, from_addr, subject, message_id
+                FROM emails
+                WHERE source = %s
+                  AND body_tsv @@ websearch_to_tsquery('simple', %s)
+                ORDER BY date_ts DESC NULLS LAST
+                LIMIT 20
+                """,
+                (SOURCE, query),
+            )
+            rows = cur.fetchall()
+        for folder, date, frm, subj, mid in rows:
+            print(f"{(date or '?'):30s}  {(folder or ''):40s}  {(frm or '')[:40]:40s}  {(subj or '')[:70]}  {mid or ''}")
+    finally:
+        conn.close()
 
 
 def main() -> int:
@@ -539,7 +673,6 @@ def main() -> int:
     parser.add_argument("--full", action="store_true", help="Full rescan + reconcile deletions")
     parser.add_argument("--stats", action="store_true")
     parser.add_argument("--search", type=str, default="")
-    parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--root", type=Path, default=DEFAULT_MAILBOX_ROOT)
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
                         help=f"Worker processes (default {DEFAULT_WORKERS} = 80%% of cores)")
@@ -552,16 +685,16 @@ def main() -> int:
     )
 
     if args.stats:
-        cmd_stats(args.db)
+        cmd_stats()
         return 0
     if args.search:
-        cmd_search(args.db, args.search)
+        cmd_search(args.search)
         return 0
 
     mode = "full" if args.full else "incremental"
     if not (args.full or args.incremental):
         parser.error("Specify --incremental, --full, --stats, or --search")
-    run_indexer(mode, args.db, args.root, workers=args.workers)
+    run_indexer(mode, args.root, workers=args.workers)
     return 0
 
 

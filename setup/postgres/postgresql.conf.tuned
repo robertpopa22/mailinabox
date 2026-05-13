@@ -1,0 +1,43 @@
+# MAIL02 PostgreSQL 16 tuning — 46GB RAM / 56 cores
+# Append/override in /etc/postgresql/16/main/postgresql.conf
+
+# Network
+listen_addresses = '10.0.1.89, 127.0.0.1'
+port = 5432
+
+# Memory
+shared_buffers = 8GB
+effective_cache_size = 24GB
+work_mem = 128MB
+maintenance_work_mem = 2GB
+huge_pages = try
+
+# Parallel
+max_connections = 100
+max_parallel_workers = 24
+max_parallel_workers_per_gather = 6
+max_parallel_maintenance_workers = 4
+
+# Storage / IO (SSD)
+random_page_cost = 1.1
+effective_io_concurrency = 200
+
+# WAL / checkpoints
+wal_compression = on
+checkpoint_completion_target = 0.9
+checkpoint_timeout = 15min
+max_wal_size = 4GB
+min_wal_size = 512MB
+
+# Logging
+log_min_duration_statement = 1000
+log_checkpoints = on
+log_connections = on
+log_disconnections = on
+log_lock_waits = on
+log_temp_files = 16MB
+log_line_prefix = '%t [%p] %u@%d '
+
+# Autovacuum
+autovacuum_max_workers = 4
+autovacuum_naptime = 30s

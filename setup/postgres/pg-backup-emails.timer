@@ -1,0 +1,12 @@
+[Unit]
+Description=Run nightly pg_dump of the emails database (04:30 local)
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=300
+AccuracySec=1m
+Persistent=true
+Unit=pg-backup-emails.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Nightly pg_dump of the emails database
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=postgres
+Group=postgres
+Nice=15
+IOSchedulingClass=idle
+# Path is hard-coded to /opt/pg-backup (installed by setup/postgres/install.sh)
+ExecStart=/usr/bin/flock -w 300 /var/lock/pg-backup-emails.lock /opt/pg-backup/pg-backup-emails.sh
+Environment=BACKUP_DIR=/home/user-data/pg-backup
+Environment=DB_NAME=emails
+Environment=RETENTION_DAYS=30
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=7200
