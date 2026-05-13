@@ -22,8 +22,8 @@ from __future__ import annotations
 import argparse
 import email as email_mod
 import email.policy as email_policy
-import hashlib
 import logging
+import multiprocessing
 import os
 import re
 import sqlite3
@@ -40,7 +40,12 @@ SKIP_FOLDERS = {".Trash", ".Spam", ".Junk"}
 
 MAX_BODY_LEN = 8000
 MAX_FILE_BYTES = 5 * 1024 * 1024  # skip files > 5 MB (rare, mostly mailing lists with big attachments)
-COMMIT_BATCH = 500
+COMMIT_BATCH = 2000
+
+# Worker count: cap at 80% of cores to leave headroom for Dovecot/Postfix
+DEFAULT_WORKERS = max(2, int((os.cpu_count() or 4) * 0.8))
+# Files per worker batch — large batches amortize IPC cost
+WORKER_BATCH_SIZE = 200
 
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 WS_RE = re.compile(r"\s+")
@@ -50,9 +55,10 @@ log = logging.getLogger("email_indexer")
 
 def init_db(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), isolation_level="DEFERRED", timeout=30.0)
+    conn = sqlite3.connect(str(db_path), isolation_level="DEFERRED", timeout=120.0)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=120000")  # 120s wait for locks
     conn.execute("PRAGMA cache_size=-65536")  # 64 MB
     conn.execute("PRAGMA mmap_size=268435456")  # 256 MB
 
@@ -249,6 +255,21 @@ def _extract_body(msg) -> str:
     return body[:MAX_BODY_LEN]
 
 
+def _safe_header(msg, name: str) -> str:
+    """Robust header read — Python 3.12 default policy crashes on some malformed headers."""
+    try:
+        return _decode_header(msg.get(name, ""))
+    except Exception:
+        return ""
+
+
+def _safe_addrs(msg, name: str) -> str:
+    try:
+        return _addrs(msg, name)
+    except Exception:
+        return ""
+
+
 def parse_email_file(fpath: Path) -> dict | None:
     try:
         size = fpath.stat().st_size
@@ -261,30 +282,40 @@ def parse_email_file(fpath: Path) -> dict | None:
             raw = f.read()
     except (PermissionError, OSError):
         return None
+    # compat32 policy is the legacy parser — tolerant of malformed RFC822/2822
+    # headers that crash the strict 'default' policy on Python 3.12+
+    # (e.g. IndexError in _header_value_parser.parse_message_id on weird Message-IDs).
     try:
-        msg = email_mod.message_from_bytes(raw, policy=email_policy.default)
+        msg = email_mod.message_from_bytes(raw, policy=email_policy.compat32)
     except Exception:
         return None
-    date_str = _decode_header(msg.get("Date", ""))
-    date_ts = 0.0
-    if date_str:
+    try:
+        date_str = _safe_header(msg, "Date")
+        date_ts = 0.0
+        if date_str:
+            try:
+                dt = parsedate_to_datetime(date_str)
+                if dt:
+                    date_ts = dt.timestamp()
+            except (TypeError, ValueError):
+                pass
         try:
-            dt = parsedate_to_datetime(date_str)
-            if dt:
-                date_ts = dt.timestamp()
-        except (TypeError, ValueError):
-            pass
-    return {
-        "message_id": _decode_header(msg.get("Message-ID", "")).strip(),
-        "date_str": date_str,
-        "date_ts": date_ts,
-        "from_addr": _addrs(msg, "From"),
-        "to_addr": _addrs(msg, "To"),
-        "cc_addr": _addrs(msg, "Cc"),
-        "subject": _decode_header(msg.get("Subject", "")).strip(),
-        "body_snippet": _extract_body(msg),
-        "size_bytes": size,
-    }
+            body = _extract_body(msg)
+        except Exception:
+            body = ""
+        return {
+            "message_id": _safe_header(msg, "Message-ID").strip(),
+            "date_str": date_str,
+            "date_ts": date_ts,
+            "from_addr": _safe_addrs(msg, "From"),
+            "to_addr": _safe_addrs(msg, "To"),
+            "cc_addr": _safe_addrs(msg, "Cc"),
+            "subject": _safe_header(msg, "Subject").strip(),
+            "body_snippet": body,
+            "size_bytes": size,
+        }
+    except Exception:
+        return None
 
 
 def upsert_email(conn: sqlite3.Connection, file_path: str, folder: str, mtime: float, parsed: dict) -> None:
@@ -332,29 +363,101 @@ def reconcile_deletions(conn: sqlite3.Connection, root: Path) -> int:
     return deleted
 
 
-def run_indexer(mode: str, db_path: Path, mailbox_root: Path) -> dict:
+def _worker_parse_batch(tasks: list[tuple[str, float, str]]) -> list[tuple[str, float, str, dict | None]]:
+    """Worker: parse a batch of files. Returns list of (path, mtime, folder, parsed_or_None).
+
+    Top-level function so multiprocessing.Pool can pickle it. Catches all
+    exceptions per-file so a single bad message cannot poison the batch.
+    """
+    out: list[tuple[str, float, str, dict | None]] = []
+    for fpath_str, mtime, folder in tasks:
+        try:
+            parsed = parse_email_file(Path(fpath_str))
+        except Exception:
+            parsed = None
+        out.append((fpath_str, mtime, folder, parsed))
+    return out
+
+
+def _chunked(iterable, size: int):
+    """Yield lists of up to `size` items from iterable."""
+    buf: list = []
+    for item in iterable:
+        buf.append(item)
+        if len(buf) >= size:
+            yield buf
+            buf = []
+    if buf:
+        yield buf
+
+
+def run_indexer(mode: str, db_path: Path, mailbox_root: Path, workers: int = DEFAULT_WORKERS) -> dict:
     t0 = time.time()
     conn = init_db(db_path)
     last_run = float(get_meta(conn, "last_incremental_ts", "0") or 0)
     since = 0.0 if mode == "full" else max(0.0, last_run - 60.0)  # 60s overlap
-    log.info("Mode=%s | root=%s | db=%s | since_mtime=%.0f", mode, mailbox_root, db_path, since)
+    log.info(
+        "Mode=%s | root=%s | db=%s | since_mtime=%.0f | workers=%d | batch=%d",
+        mode, mailbox_root, db_path, since, workers, WORKER_BATCH_SIZE,
+    )
 
     processed = 0
     skipped = 0
     pending = 0
-    for fpath, mtime, folder in walk_maildir_files(mailbox_root, since_mtime=since):
-        parsed = parse_email_file(fpath)
-        if parsed is None:
-            skipped += 1
-            continue
-        upsert_email(conn, str(fpath), folder, mtime, parsed)
-        processed += 1
-        pending += 1
-        if pending >= COMMIT_BATCH:
-            conn.commit()
-            pending = 0
-        if processed % 5000 == 0:
-            log.info("Progress: %d processed, %d skipped (elapsed %.1fs)", processed, skipped, time.time() - t0)
+
+    # Tasks streamed from walk → string paths (pickle-friendly for workers)
+    def task_iter():
+        for fpath, mtime, folder in walk_maildir_files(mailbox_root, since_mtime=since):
+            yield (str(fpath), mtime, folder)
+
+    if workers <= 1:
+        # Fallback single-threaded path
+        for fpath_str, mtime, folder in task_iter():
+            try:
+                parsed = parse_email_file(Path(fpath_str))
+                if parsed is None:
+                    skipped += 1
+                    continue
+                upsert_email(conn, fpath_str, folder, mtime, parsed)
+            except Exception as e:
+                log.warning("Skipping %s: %s", fpath_str, e)
+                skipped += 1
+                continue
+            processed += 1
+            pending += 1
+            if pending >= COMMIT_BATCH:
+                conn.commit()
+                pending = 0
+            if processed % 10000 == 0:
+                log.info("Progress: %d processed, %d skipped (%.1fs)", processed, skipped, time.time() - t0)
+    else:
+        # Multiprocessing path — workers parse files (CPU-bound), main writes DB (I/O serialized)
+        ctx = multiprocessing.get_context("fork")
+        with ctx.Pool(processes=workers) as pool:
+            batches = _chunked(task_iter(), WORKER_BATCH_SIZE)
+            for batch_result in pool.imap_unordered(_worker_parse_batch, batches):
+                for fpath_str, mtime, folder, parsed in batch_result:
+                    if parsed is None:
+                        skipped += 1
+                        continue
+                    try:
+                        upsert_email(conn, fpath_str, folder, mtime, parsed)
+                    except Exception as e:
+                        log.warning("Upsert failed for %s: %s", fpath_str, e)
+                        skipped += 1
+                        continue
+                    processed += 1
+                    pending += 1
+                if pending >= COMMIT_BATCH:
+                    conn.commit()
+                    pending = 0
+                if processed and (processed // 10000) != ((processed - len(batch_result)) // 10000):
+                    rate = processed / max(0.001, time.time() - t0)
+                    log.info(
+                        "Progress: %d processed, %d skipped (%.1fs, %.0f msg/s)",
+                        processed, skipped, time.time() - t0, rate,
+                    )
+
     if pending:
         conn.commit()
 
@@ -373,6 +476,11 @@ def run_indexer(mode: str, db_path: Path, mailbox_root: Path) -> dict:
     conn.commit()
 
     total = conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]
+    # Checkpoint WAL into main DB so the file is consistent for rsync/scp
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except sqlite3.OperationalError:
+        pass
     conn.close()
 
     stats = {
@@ -433,6 +541,8 @@ def main() -> int:
     parser.add_argument("--search", type=str, default="")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--root", type=Path, default=DEFAULT_MAILBOX_ROOT)
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
+                        help=f"Worker processes (default {DEFAULT_WORKERS} = 80%% of cores)")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -451,7 +561,7 @@ def main() -> int:
     mode = "full" if args.full else "incremental"
     if not (args.full or args.incremental):
         parser.error("Specify --incremental, --full, --stats, or --search")
-    run_indexer(mode, args.db, args.root)
+    run_indexer(mode, args.db, args.root, workers=args.workers)
     return 0
 
 

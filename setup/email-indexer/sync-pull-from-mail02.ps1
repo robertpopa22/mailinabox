@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $Key  = "$env:USERPROFILE\.ssh\ges-mail01"
 $User = 'dit2022'
-$Host = '10.0.1.89'
+$MailHost = '10.0.1.89'
 $Src  = '/var/lib/email-indexer/live.db'
 $Dst  = 'D:\ArhivaEmail\email_archive_live.db'
 $Tmp  = "$Dst.tmp"
@@ -23,7 +23,7 @@ function Log($msg) {
 
 try {
   # SCP into tmp, then atomic rename to avoid partial-read during MCP query
-  & scp -i $Key -o StrictHostKeyChecking=accept-new "${User}@${Host}:$Src" $Tmp
+  & scp -i $Key -o StrictHostKeyChecking=accept-new "${User}@${MailHost}:$Src" $Tmp
   if ($LASTEXITCODE -ne 0) { throw "scp exit $LASTEXITCODE" }
   Move-Item -Path $Tmp -Destination $Dst -Force
   Log "OK ($([math]::Round((Get-Item $Dst).Length/1MB,1)) MB)"
