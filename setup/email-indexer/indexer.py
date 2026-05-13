@@ -483,6 +483,18 @@ def run_indexer(mode: str, mailbox_root: Path, workers: int = DEFAULT_WORKERS) -
     conn = get_pg_conn()
     try:
         last_run = float(get_meta(conn, "last_incremental_ts", "0") or 0)
+        # Bootstrap: if meta missing (first run after migration), use DB MAX(mtime)
+        # as cursor — avoids full re-scan + 879K UPSERTs of unchanged rows.
+        if mode != "full" and last_run == 0:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COALESCE(MAX(mtime), 0) FROM emails WHERE source = %s",
+                    (SOURCE,),
+                )
+                bootstrap = float(cur.fetchone()[0] or 0)
+            if bootstrap > 0:
+                last_run = bootstrap
+                log.info("Meta empty — bootstrap since_mtime from DB MAX(mtime)=%.0f", bootstrap)
         since = 0.0 if mode == "full" else max(0.0, last_run - 60.0)  # 60s overlap
         log.info(
             "Mode=%s | root=%s | since_mtime=%.0f | workers=%d | batch=%d | source=%s",
