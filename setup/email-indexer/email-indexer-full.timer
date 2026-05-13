@@ -1,0 +1,12 @@
+[Unit]
+Description=Run full email indexer rescan nightly (03:00)
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=600
+AccuracySec=1min
+Persistent=true
+Unit=email-indexer-full.service
+
+[Install]
+WantedBy=timers.target

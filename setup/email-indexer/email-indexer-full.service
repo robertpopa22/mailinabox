@@ -1,0 +1,18 @@
+[Unit]
+Description=Email FTS5 indexer (full rescan + reconcile deletions)
+After=dovecot.service
+Wants=dovecot.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+Nice=15
+IOSchedulingClass=idle
+ExecStart=/usr/bin/python3 /opt/email-indexer/indexer.py --full
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=7200
+ExecStartPost=/bin/chmod 644 /var/lib/email-indexer/live.db
+ExecStartPost=-/bin/chmod 644 /var/lib/email-indexer/live.db-wal
+ExecStartPost=-/bin/chmod 644 /var/lib/email-indexer/live.db-shm

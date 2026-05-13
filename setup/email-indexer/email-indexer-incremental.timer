@@ -1,0 +1,12 @@
+[Unit]
+Description=Run incremental email indexer every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+AccuracySec=30s
+Persistent=true
+Unit=email-indexer-incremental.service
+
+[Install]
+WantedBy=timers.target
