@@ -10,7 +10,7 @@ Group=postgres
 Nice=15
 IOSchedulingClass=idle
 # Path is hard-coded to /opt/pg-backup (installed by setup/postgres/install.sh)
-ExecStart=/usr/bin/flock -w 300 /var/lock/pg-backup-emails.lock /opt/pg-backup/pg-backup-emails.sh
+ExecStart=/usr/bin/flock -w 300 /var/lock/pg-backup-emails.lock /usr/local/bin/pg-backup-emails.sh
 Environment=BACKUP_DIR=/home/user-data/pg-backup
 Environment=DB_NAME=emails
 Environment=RETENTION_DAYS=30

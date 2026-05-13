@@ -100,9 +100,11 @@ def _read_env_file(path: Path) -> dict[str, str]:
 
 def resolve_dsn(env_file: Path = DEFAULT_PG_ENV_FILE) -> str:
     """Return PostgreSQL DSN from env or /etc/mailinabox/postgres.env."""
-    dsn = os.environ.get("PG_DSN", "").strip()
-    if dsn:
-        return dsn
+    # Prefer env vars; reject systemd-style unexpanded `${...}` placeholders.
+    for var in ("PG_DSN", "PG_DSN_INDEXER"):
+        dsn = os.environ.get(var, "").strip()
+        if dsn and not dsn.startswith("${"):
+            return dsn
     env = _read_env_file(env_file)
     dsn = env.get("PG_DSN_INDEXER") or env.get("PG_DSN") or ""
     if not dsn:
@@ -400,7 +402,7 @@ def _row_tuple(file_path: str, folder: str, mtime: float, parsed: dict, now: flo
         parsed["subject"] or None,
         parsed["body_snippet"] or None,
         int(parsed["size_bytes"]),
-        _ts_to_dt(mtime),
+        mtime,  # DOUBLE PRECISION (epoch seconds), NOT timestamp
         _ts_to_dt(now),
     )
 
