@@ -169,6 +169,27 @@ def get_domain_ssl_files(domain, ssl_certificates, env, allow_missing_cert=False
 
 # PROVISIONING CERTIFICATES FROM LETSENCRYPT
 
+# Public DNS resolvers used when validating that a domain points to this box
+# before we try to provision a certificate. We must NOT rely on the box's own
+# resolver here: in split-horizon / NAT setups the local resolver may answer
+# with the PRIVATE_IP for the box's own hostname (and anything CNAME'd to it),
+# which would make us wrongly skip provisioning even though Let's Encrypt --
+# which uses *public* DNS -- can validate the domain just fine. See
+# get_certificates_to_provision().
+PUBLIC_DNS_RESOLVERS = ["1.1.1.1", "8.8.8.8"]
+
+def query_public_dns(domain, rtype):
+	# Resolve a domain using public resolvers so the answer matches what
+	# Let's Encrypt sees, regardless of any split-horizon / NAT answers from
+	# the box's local resolver. Falls back across resolvers on timeout.
+	from status_checks import query_dns
+	response = None
+	for nameserver in PUBLIC_DNS_RESOLVERS:
+		response = query_dns(domain, rtype, at=nameserver)
+		if response not in {"[timeout]", "[Not Set]"}:
+			return response
+	return response
+
 def get_certificates_to_provision(env, limit_domains=None, show_valid_certs=True):
 	# Get a set of domain names that we can provision certificates for
 	# using certbot. We start with domains that the box is serving web
@@ -208,7 +229,12 @@ def get_certificates_to_provision(env, limit_domains=None, show_valid_certs=True
 			bad_dns = []
 			for rtype, value in [("A", env["PUBLIC_IP"]), ("AAAA", env.get("PUBLIC_IPV6"))]:
 				if not value: continue # IPv6 is not configured
-				response = query_dns(domain, rtype)
+				# Query public DNS rather than the box's local resolver: a
+				# split-horizon / NAT setup can resolve the box's own hostname
+				# to PRIVATE_IP locally, which would falsely fail this check
+				# and skip auto-renewal even though Let's Encrypt can validate
+				# the domain via public DNS.
+				response = query_public_dns(domain, rtype)
 				if response != normalize_ip(value):
 					bad_dns.append(f"{response} ({rtype})")
 
