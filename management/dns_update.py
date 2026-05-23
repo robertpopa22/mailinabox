@@ -259,6 +259,7 @@ def build_zone(domain, domain_properties, additional_records, env, is_zone=True)
 		if domain.startswith("mta-sts."): a_expl = "Optional. MTA-STS Policy Host serving /.well-known/mta-sts.txt."
 		if domain.startswith("autoconfig."): a_expl = "Provides email configuration autodiscovery support for Thunderbird Autoconfig."
 		if domain.startswith("autodiscover."): a_expl = "Provides email configuration autodiscovery support for Z-Push ActiveSync Autodiscover."
+		if domain.startswith("mail."): a_expl = f"Optional. Provides per-domain webmail access at https://{domain}/mail/ (Roundcube)."
 	defaults = [
 		(None,  "A",    env["PUBLIC_IP"], a_expl),
 		(None,  "AAAA", env.get('PUBLIC_IPV6'), f"Optional. Sets the IPv6 address that {domain} resolves to, e.g. for web hosting. (It is not necessary for receiving mail on this domain.)"),

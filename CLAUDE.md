@@ -31,6 +31,7 @@ Fiecare branch e independent, de pe `main`:
 | `feature/rspamd-spam-filter` | Înlocuire SpamAssassin cu rspamd |
 | `feature/whitelist-management` | API admin whitelist/blacklist (ambele filtre) |
 | `feature/rspamd-hardening` | DQS, composite rules, DMARC scoring, Lua anti-phishing |
+| `feature/webmail-subdomain` | Webmail per-domeniu: `mail.<domeniu>/mail/` (Roundcube) cu cert LE propriu, auto-provizionat ca `autoconfig.`/`autodiscover.` (necesita DNS `mail.<domeniu>` A → box) |
 
 ---
 

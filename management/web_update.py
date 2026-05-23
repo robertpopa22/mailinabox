@@ -31,6 +31,12 @@ def get_web_domains(env, include_www_redirects=True, include_auto=True, exclude_
 		domains |= {'autoconfig.' + maildomain for maildomain in get_mail_domains(env, users_only=True)}
 		domains |= {'autodiscover.' + maildomain for maildomain in get_mail_domains(env, users_only=True)}
 
+		# 'mail.' for per-domain webmail access. Each domain with user accounts
+		# gets https://mail.<domain>/mail/ (Roundcube) served with its own TLS
+		# certificate, so clients on shared hosting can use a branded webmail URL
+		# instead of the box's PRIMARY_HOSTNAME. Served via nginx-alldomains.conf.
+		domains |= {'mail.' + maildomain for maildomain in get_mail_domains(env, users_only=True)}
+
 		# 'mta-sts.' for MTA-STS support for all domains that have email addresses.
 		domains |= {'mta-sts.' + maildomain for maildomain in get_mail_domains(env)}
 
