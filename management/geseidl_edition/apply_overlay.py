@@ -54,7 +54,7 @@ def write_stamp():
 	stamp = {
 		"overlay_version": overlay_version(),
 		"fingerprint": compute_fingerprint(),
-		"applied_utc": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+		"applied_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
 	}
 	try:
 		with open(STAMP_FILE, "w", encoding="utf-8") as f:
