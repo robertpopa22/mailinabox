@@ -1,0 +1,37 @@
+diff --git a/setup/mail-postfix.sh b/setup/mail-postfix.sh
+index 5a4c7fe..007ab40 100755
+--- a/setup/mail-postfix.sh
++++ b/setup/mail-postfix.sh
+@@ -205,13 +205,27 @@ tools/editconf.py /etc/postfix/main.cf \
+ 
+ # ### Incoming Mail
+ 
+-# Pass mail to spampd, which acts as the local delivery agent (LDA),
+-# which then passes the mail over to the Dovecot LMTP server after.
+-# spampd runs on port 10025 by default.
+-#
++# Pass mail to the spam filter before delivery to Dovecot.
+ # In a basic setup we would pass mail directly to Dovecot by setting
+ # virtual_transport to `lmtp:unix:private/dovecot-lmtp`.
+-tools/editconf.py /etc/postfix/main.cf "virtual_transport=lmtp:[127.0.0.1]:10025"
++
++SPAM_FILTER=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^spam_filter:" | awk '{print $2}')
++SPAM_FILTER=${SPAM_FILTER:-spamassassin}
++
++if [ "$SPAM_FILTER" = "rspamd" ]; then
++	tools/editconf.py /etc/postfix/main.cf \
++		"virtual_transport=lmtp:[127.0.0.1]:10026" \
++		"smtpd_milters=inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893" \
++		"non_smtpd_milters=inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893" \
++		milter_default_action=accept \
++		milter_protocol=6
++
++	sed -i '/content_filter=spamassassin/d' /etc/postfix/master.cf
++	sed -i '/^spamassassin[[:space:]]*unix/,/^[a-z]/{/^spamassassin/d;/spamc/d}' /etc/postfix/master.cf
++else
++	tools/editconf.py /etc/postfix/main.cf \
++		"virtual_transport=lmtp:[127.0.0.1]:10025"
++fi
+ # Clear the lmtp_destination_recipient_limit setting which in previous
+ # versions of Mail-in-a-Box was set to 1 because of a spampd bug.
+ # See https://github.com/mail-in-a-box/mailinabox/issues/1523.

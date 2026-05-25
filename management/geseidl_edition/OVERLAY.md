@@ -70,7 +70,7 @@ Toate customizările Geseidl, grupate. Sursă: feature branches existente + chec
 | **ssl** | cert-provisioning resolve-check pe DNS public (patch idempotent) | provisioning (patch) | **implementat (v0.4.0)** |
 | **mail** | arhiva email (`always_bcc`) cod-gestionată din settings.yaml | provisioning | **implementat (v0.5.0)** |
 | **web** | webmail-subdomain (`mail.<domeniu>/mail/` + branding HTTP_HOST), patch-uri idempotente | provisioning (patch) | **implementat (v0.6.0)** |
-| **spam** | rspamd (installer 446l + integrare + API/UI). Gardă idempotentă; patch-uri integrare = TODO | provisioning + runtime | **capturat parțial (v0.7.0)** |
+| **spam** | rspamd: fișiere noi fork-tracked (installer 446l `setup/rspamd.sh` + UI `system-spam.html`) + 4 patch-uri integrare (mail-postfix/spamassassin/daemon-api/index, signature-gate, dry-run+revert) | provisioning + runtime | **implementat (v0.8.0)** |
 
 Runtime vs provisioning:
 - **runtime** = cod Python care se cuplează în daemon-ul de management la rulare (hook marcat).

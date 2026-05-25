@@ -1,0 +1,23 @@
+diff --git a/management/templates/index.html b/management/templates/index.html
+index ce1c15d..1ea6347 100644
+--- a/management/templates/index.html
++++ b/management/templates/index.html
+@@ -120,6 +120,7 @@
+                 <li><a href="#custom_dns">Custom DNS</a></li>
+                 <li><a href="#external_dns">External DNS</a></li>
+                 <li><a href="#munin">Munin Monitoring</a></li>
++                <li><a href="#spam_filter">Spam Filter</a></li>
+               </ul>
+             </li>
+             <li><a href="#mail-guide" class="if-logged-in-not-admin">Mail</a></li>
+@@ -201,6 +202,10 @@
+       {% include "munin.html" %}
+       </div>
+ 
++      <div id="panel_spam_filter" class="admin_panel">
++      {% include "system-spam.html" %}
++      </div>
++
+       <hr>
+ 
+       <footer>

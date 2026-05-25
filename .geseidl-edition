@@ -1,7 +1,8 @@
 # Geseidl Edition overlay manifest.
 # Prezenta acestui fisier = overlay activ. Vezi management/geseidl_edition/OVERLAY.md
 edition: geseidl
-overlay_version: 0.7.0
+overlay_version: 0.8.0
+# 0.8.0: zona spam completa — patch-uri integrare extrase+verificate (mail-postfix/spamassassin/daemon-api/index) + apply.sh signature-gate
 upstream_base: v75
 zones:
   - status

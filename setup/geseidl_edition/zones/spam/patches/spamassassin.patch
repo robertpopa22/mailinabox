@@ -1,0 +1,97 @@
+diff --git a/setup/spamassassin.sh b/setup/spamassassin.sh
+index d71a8ef..837118b 100755
+--- a/setup/spamassassin.sh
++++ b/setup/spamassassin.sh
+@@ -12,6 +12,47 @@
+ source /etc/mailinabox.conf # get global vars
+ source setup/functions.sh # load our functions
+ 
++# Check which spam filter is configured.
++SPAM_FILTER=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^spam_filter:" | awk '{print $2}')
++SPAM_FILTER=${SPAM_FILTER:-spamassassin}
++
++if [ "$SPAM_FILTER" = "rspamd" ]; then
++	source setup/rspamd.sh
++	return 0 2>/dev/null || exit 0
++fi
++
++# === CLEANUP RSPAMD (if switching back to SpamAssassin) ===
++
++if systemctl is-active rspamd > /dev/null 2>&1; then
++	echo "Switching from rspamd to SpamAssassin..."
++	systemctl stop rspamd 2>/dev/null
++	systemctl disable rspamd 2>/dev/null
++fi
++
++# Unmask spampd/spamassassin (rspamd setup may have masked them)
++systemctl unmask spampd 2>/dev/null
++systemctl unmask spamassassin 2>/dev/null
++
++# Remove rspamd IMAPSieve config and sieve scripts (SA uses antispam plugin)
++rm -f /etc/dovecot/conf.d/90-imapsieve.conf
++rm -f /etc/dovecot/sieve/learn-spam.sieve /etc/dovecot/sieve/learn-spam.svbin
++rm -f /etc/dovecot/sieve/learn-ham.sieve /etc/dovecot/sieve/learn-ham.svbin
++rm -f /etc/dovecot/sieve/rspamd-learn.sh
++rm -f /etc/systemd/system/dovecot.service.d/sieve-write.conf
++rmdir /etc/systemd/system/dovecot.service.d 2>/dev/null
++systemctl daemon-reload
++
++# Remove imap_sieve from Dovecot mail_plugins (SA uses antispam plugin)
++sed -i 's/ imap_sieve//' /etc/dovecot/conf.d/20-imap.conf 2>/dev/null
++sed -i 's/ imap_sieve//' /etc/dovecot/conf.d/20-pop3.conf 2>/dev/null
++
++# Reset Postfix to SpamAssassin config (milters back to OpenDKIM+OpenDMARC only)
++tools/editconf.py /etc/postfix/main.cf \
++	"virtual_transport=lmtp:[127.0.0.1]:10025" \
++	"smtpd_milters=inet:127.0.0.1:8891 inet:127.0.0.1:8893" \
++	"non_smtpd_milters=inet:127.0.0.1:8891 inet:127.0.0.1:8893"
++tools/editconf.py /etc/postfix/main.cf -e milter_protocol=
++
+ # Install packages and basic configuration
+ # ----------------------------------------
+ 
+@@ -149,6 +190,13 @@ chown -R spampd:spampd "$STORAGE_ROOT/mail/spamassassin"
+ # (Be careful if we use multiple plugins later.) #NODOC
+ sed -i "s/#mail_plugins = .*/mail_plugins = \$mail_plugins antispam/" /etc/dovecot/conf.d/20-imap.conf
+ sed -i "s/#mail_plugins = .*/mail_plugins = \$mail_plugins antispam/" /etc/dovecot/conf.d/20-pop3.conf
++# If the line was already uncommented (e.g. after rspamd), add antispam if missing
++if ! grep -q 'antispam' /etc/dovecot/conf.d/20-imap.conf 2>/dev/null; then
++	sed -i 's/\(mail_plugins = .*imap_quota\)/\1 antispam/' /etc/dovecot/conf.d/20-imap.conf
++fi
++if ! grep -q 'antispam' /etc/dovecot/conf.d/20-pop3.conf 2>/dev/null; then
++	sed -i 's/\(mail_plugins = .*\)/\1 antispam/' /etc/dovecot/conf.d/20-pop3.conf
++fi
+ 
+ # Configure the antispam plugin to call sa-learn-pipe.sh.
+ cat > /etc/dovecot/conf.d/99-local-spampd.conf << EOF;
+@@ -191,6 +239,30 @@ chmod 770 "$STORAGE_ROOT/mail/spamassassin"
+ # sa-learn --ham storage/mail/mailboxes/*/*/cur/
+ # sa-learn --spam storage/mail/mailboxes/*/*/.Spam/cur/
+ 
++# Generate whitelist/blacklist rules from settings.yaml.
++MIAB_PYTHON="/usr/local/lib/mailinabox/env/bin/python3"
++if [ ! -x "$MIAB_PYTHON" ]; then
++	MIAB_PYTHON="python3"
++fi
++$MIAB_PYTHON << PYEOF
++import sys, os
++sys.path.insert(0, os.path.join('$PWD', 'management'))
++from utils import load_settings, load_environment
++env = load_environment()
++settings = load_settings(env)
++wl = settings.get('spam_whitelist', [])
++bl = settings.get('spam_blacklist', [])
++lines = []
++lines.append("# Auto-generated from settings.yaml by Mail-in-a-Box setup")
++lines.append("# Do not edit manually - use the admin API instead")
++for addr in wl:
++    lines.append("whitelist_from %s" % addr)
++for addr in bl:
++    lines.append("blacklist_from %s" % addr)
++with open('/etc/spamassassin/miab_whitelist.cf', 'w') as f:
++    f.write('\n'.join(lines) + '\n')
++PYEOF
++
+ # Kick services.
+ restart_service spampd
+ restart_service dovecot
