@@ -5,6 +5,7 @@ realitatea PUBLICA (DNS 1.1.1.1, HTTP, TLS) si o trecem pe verde DOAR daca chiar
 in regula. Ce nu recunoastem ramane neatins (nu ascundem probleme noi).
 """
 
+import os
 import re
 
 from .. import dnsutil
@@ -218,6 +219,27 @@ def process_sections(sections, env, pool, manifest):
 				if item["kind"] == "warning" and "Backups are disabled" in item["text"]:
 					item["kind"] = "ok"
 					item["text"] = f"Backup gestionat extern (GES-BACKUP), nu prin MiaB. [{EDITION}]"
+			# Disc: prag adaptat la disc mare (warning la 10% liber, nu 15-30% upstream)
+			for item in section["items"]:
+				if "space remaining" in item["text"] or "free space" in item["text"]:
+					try:
+						st = os.statvfs(env.get("STORAGE_ROOT", "/"))
+						free = st.f_bavail * st.f_frsize
+						total = st.f_blocks * st.f_frsize
+						pct = (100.0 * free / total) if total else 0
+						gb = free / (1024.0 ** 3)
+						if pct >= 10:
+							item["kind"] = "ok"
+							item["text"] = f"Disc: {gb:.0f} GB liberi ({pct:.0f}%). [{EDITION}]"
+						elif pct >= 5:
+							item["kind"] = "warning"
+							item["text"] = f"Disc: {gb:.0f} GB liberi ({pct:.0f}%) — sub 10%, planifica marirea. [{EDITION}]"
+						else:
+							item["kind"] = "error"
+							item["text"] = f"Disc: doar {gb:.0f} GB liberi ({pct:.0f}%) — CRITIC, marire urgenta. [{EDITION}]"
+					except Exception:
+						pass
+					break
 		elif name == "Network":
 			# re-verifica spamhaus pt IP-ul box-ului (DQS); restul ramane
 			def _safe(it):
