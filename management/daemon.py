@@ -590,6 +590,13 @@ def system_status():
 	# Create a temporary pool of processes for the status checks
 	with multiprocessing.pool.Pool(processes=5) as pool:
 		run_checks(False, env, output, pool)
+		# >>> GESEIDL EDITION OVERLAY >>>
+		try:
+			from geseidl_edition import apply_overlay as _ges_apply
+			_ges_apply(output, env, pool)
+		except Exception as _ges_e:
+			output.items.append({"type": "warning", "text": "Geseidl overlay: %s" % _ges_e, "extra": []})
+		# <<< GESEIDL EDITION OVERLAY <<<
 		pool.close()
 		pool.join()
 	return json_response(output.items)

@@ -1038,6 +1038,13 @@ def run_and_output_changes(env, pool):
 	# Run status checks.
 	cur = BufferedOutput()
 	run_checks(True, env, cur, pool)
+	# >>> GESEIDL EDITION OVERLAY >>>
+	try:
+		from geseidl_edition import apply_overlay_buffer as _ges_apply_buf
+		_ges_apply_buf(cur.buf, env)
+	except Exception:
+		pass
+	# <<< GESEIDL EDITION OVERLAY <<<
 
 	# Load previously saved status checks.
 	cache_fn = "/var/cache/mailinabox/status_checks.json"
@@ -1192,7 +1199,16 @@ if __name__ == "__main__":
 
 	if len(sys.argv) == 1:
 		with multiprocessing.pool.Pool(processes=10) as pool:
-			run_checks(False, env, ConsoleOutput(), pool)
+			# >>> GESEIDL EDITION OVERLAY >>>
+			try:
+				from geseidl_edition import apply_overlay_buffer as _ges_apply_buf
+				_ges_buf = BufferedOutput()
+				run_checks(False, env, _ges_buf, pool)
+				_ges_apply_buf(_ges_buf.buf, env)
+				_ges_buf.playback(ConsoleOutput())
+			except Exception:
+				run_checks(False, env, ConsoleOutput(), pool)
+			# <<< GESEIDL EDITION OVERLAY <<<
 
 	elif sys.argv[1] == "--show-changes":
 		with multiprocessing.pool.Pool(processes=10) as pool:
