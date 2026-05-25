@@ -67,10 +67,10 @@ Toate customizările Geseidl, grupate. Sursă: feature branches existente + chec
 |------|----------|-----|--------|
 | **status** | badge versiune fork, NS/glue/resolve/MX/DNSSEC re-verificate public, site-live, MTA-STS real, **Spamhaus DQS**, backup extern | runtime | **implementat (v0.2.0)** |
 | **dns** | resolver → `127.0.0.1` (bind9 local) + spamhaus exception zones, idempotent, verify+rollback | provisioning (bind9) | **implementat (v0.2.0)** |
-| **spam** | rspamd-spam-filter, rspamd-hardening, whitelist/blacklist API, spamhaus DQS | provisioning + runtime (API) | de migrat |
-| **mail** | email-archive (`always_bcc`), imapsieve-trash-fix | provisioning + settings | de migrat |
-| **web** | webmail-subdomain (nginx + Roundcube per-domeniu), aliases UI fix | provisioning (nginx) + UI | de migrat |
-| **ssl** | cert-renewal-public-dns-check | provisioning/runtime | de migrat |
+| **ssl** | cert-provisioning resolve-check pe DNS public (patch idempotent) | provisioning (patch) | **implementat (v0.4.0)** |
+| **mail** | arhiva email (`always_bcc`) cod-gestionată din settings.yaml | provisioning | **implementat (v0.5.0)** |
+| **web** | webmail-subdomain (`mail.<domeniu>/mail/` + branding HTTP_HOST), patch-uri idempotente | provisioning (patch) | **implementat (v0.6.0)** |
+| **spam** | rspamd (installer 446l + integrare + API/UI). Gardă idempotentă; patch-uri integrare = TODO | provisioning + runtime | **capturat parțial (v0.7.0)** |
 
 Runtime vs provisioning:
 - **runtime** = cod Python care se cuplează în daemon-ul de management la rulare (hook marcat).
