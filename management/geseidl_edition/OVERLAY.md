@@ -65,10 +65,10 @@ Toate customizările Geseidl, grupate. Sursă: feature branches existente + chec
 
 | Zonă | Conținut | Tip | Status |
 |------|----------|-----|--------|
-| **status** | external-dns/nat false-positives, badge versiune fork, site-live, MX afirmativ, cert expiry, DNSSEC public, MTA-STS real | runtime | **implementat** |
+| **status** | badge versiune fork, NS/glue/resolve/MX/DNSSEC re-verificate public, site-live, MTA-STS real, **Spamhaus DQS**, backup extern | runtime | **implementat (v0.2.0)** |
+| **dns** | resolver → `127.0.0.1` (bind9 local) + spamhaus exception zones, idempotent, verify+rollback | provisioning (bind9) | **implementat (v0.2.0)** |
 | **spam** | rspamd-spam-filter, rspamd-hardening, whitelist/blacklist API, spamhaus DQS | provisioning + runtime (API) | de migrat |
 | **mail** | email-archive (`always_bcc`), imapsieve-trash-fix | provisioning + settings | de migrat |
-| **dns** | external-dns-settings, spamhaus bind9 forwarders | provisioning (bind9) + settings | de migrat |
 | **web** | webmail-subdomain (nginx + Roundcube per-domeniu), aliases UI fix | provisioning (nginx) + UI | de migrat |
 | **ssl** | cert-renewal-public-dns-check | provisioning/runtime | de migrat |
 
