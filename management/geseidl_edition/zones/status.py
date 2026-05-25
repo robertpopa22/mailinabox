@@ -143,6 +143,22 @@ def _reverify_item(item, domain, env, external):
 			miss.append("policy host")
 		return mk("error", f"{domain}: MTA-STS lipseste ({', '.join(miss)}) — de provizionat (Cloudflare TXT + mta-sts.{domain}). [{EDITION}]")
 
+	# 6) spamhaus RBL "could not determine" (shared resolver) -> re-verificam via DQS
+	if "configured to use a public DNS server" in t or ("spamhaus" in t.lower() and "Could not determine" in t):
+		if "this box" in t or "IPv4 address is blacklisted" in t:
+			res = dnsutil.spamhaus_ip(public_ip)
+			target = f"IP {public_ip}"
+		else:
+			m = re.search(r"whether the domain (\S+?) is blacklisted", t)
+			dom = m.group(1) if m else domain
+			res = dnsutil.spamhaus_domain(dom)
+			target = dom
+		if res["status"] == "clean":
+			return mk("ok", f"{target}: nu e pe lista Spamhaus (verificat DQS). [{EDITION}]")
+		if res["status"] == "listed":
+			return mk("error", f"{target}: LISTAT Spamhaus {res['codes']} — afecteaza livrarea! [{EDITION}]")
+		return None  # nokey/error/unknown -> lasam ? informativ (nu mascam)
+
 	# necunoscut -> pastram neatins (nu mascam)
 	return None
 
@@ -157,7 +173,10 @@ def _process_domain_section(section, env):
 	apex_sitelive_done = False
 	new_items = []
 	for item in section["items"]:
-		rep = _reverify_item(item, domain, env, external)
+		try:
+			rep = _reverify_item(item, domain, env, external)
+		except Exception:
+			rep = None  # un check picat nu trebuie sa darame sectiunea
 		if rep is None:
 			new_items.append(item)
 		else:
@@ -199,7 +218,15 @@ def process_sections(sections, env, pool, manifest):
 				if item["kind"] == "warning" and "Backups are disabled" in item["text"]:
 					item["kind"] = "ok"
 					item["text"] = f"Backup gestionat extern (GES-BACKUP), nu prin MiaB. [{EDITION}]"
-		elif name in ("Network", "", None):
+		elif name == "Network":
+			# re-verifica spamhaus pt IP-ul box-ului (DQS); restul ramane
+			def _safe(it):
+				try:
+					return _reverify_item(it, "", env, False) or it
+				except Exception:
+					return it
+			section["items"] = [_safe(it) for it in section["items"]]
+		elif name in ("", None):
 			continue
 		else:
 			_process_domain_section(section, env)

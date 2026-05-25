@@ -6,6 +6,7 @@ stabilim adevarul vazut din internet. Toate functiile sunt defensive (timeout,
 try/except, valori sigure la esec).
 """
 
+import os
 import socket
 import ssl
 import datetime
@@ -181,6 +182,77 @@ def tls_cert_days(host, port=443, timeout=TIMEOUT):
 		return (exp - datetime.datetime.utcnow()).days
 	except Exception:
 		return None
+
+
+_DQS_KEY = None
+_DQS_SCANNED = False
+
+
+def get_dqs_key():
+	"""Citeste cheia Spamhaus DQS din configul rspamd (NU hardcodata in repo).
+
+	Cauta pattern-ul <key>.{zen,dbl}.dq.spamhaus in /etc/rspamd/. Returns key sau None.
+	"""
+	global _DQS_KEY, _DQS_SCANNED
+	if _DQS_SCANNED:
+		return _DQS_KEY
+	_DQS_SCANNED = True
+	import re as _re
+	pat = _re.compile(r"([a-z0-9]{20,})\.(?:zen|dbl)\.dq\.spamhaus", _re.I)
+	for base in ("/etc/rspamd", "/home/user-data/conf/rspamd"):
+		if not os.path.isdir(base):
+			continue
+		for root, _dirs, names in os.walk(base):
+			for n in names:
+				try:
+					with open(os.path.join(root, n), encoding="utf-8", errors="ignore") as f:
+						m = pat.search(f.read())
+						if m:
+							_DQS_KEY = m.group(1)
+							return _DQS_KEY
+				except OSError:
+					pass
+	return _DQS_KEY
+
+
+def _dqs_lookup(qname):
+	"""Returns 'clean' (NXDOMAIN), 'listed' (127.x.x.x), 'error'/'nokey'/'unknown'."""
+	ans = query(qname, "A")
+	if not ans:
+		# distinge NXDOMAIN (clean) de eroare? query() inghite ambele -> tratam empty=clean
+		return "clean"
+	if any(a.startswith("127.") for a in ans):
+		# 127.255.255.x = erori DQS (cheie invalida/limita), nu listare reala
+		if any(a.startswith("127.255.255.") for a in ans):
+			return "error"
+		return "listed"
+	return "unknown"
+
+
+def spamhaus_ip(ip):
+	"""Verifica IP in zen via DQS. Returns dict(ok, status, codes)."""
+	key = get_dqs_key()
+	if not key:
+		return {"ok": None, "status": "nokey", "codes": None}
+	parts = ip.split(".")
+	if len(parts) != 4:
+		return {"ok": None, "status": "badip", "codes": None}
+	rev = ".".join(reversed(parts))
+	qname = f"{rev}.{key}.zen.dq.spamhaus.net"
+	st = _dqs_lookup(qname)
+	codes = query(qname, "A") if st == "listed" else None
+	return {"ok": st == "clean", "status": st, "codes": codes}
+
+
+def spamhaus_domain(domain):
+	"""Verifica domeniu in dbl via DQS. Returns dict(ok, status, codes)."""
+	key = get_dqs_key()
+	if not key:
+		return {"ok": None, "status": "nokey", "codes": None}
+	qname = f"{domain}.{key}.dbl.dq.spamhaus.net"
+	st = _dqs_lookup(qname)
+	codes = query(qname, "A") if st == "listed" else None
+	return {"ok": st == "clean", "status": st, "codes": codes}
 
 
 def mta_sts_present(domain, timeout=TIMEOUT):

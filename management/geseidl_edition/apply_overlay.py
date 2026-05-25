@@ -259,11 +259,17 @@ def cmd_selftest():
 	def head(t):
 		return {"type": "heading", "text": t, "extra": []}
 
+	def warn(t):
+		return {"type": "warning", "text": t, "extra": []}
+
 	items = [
 		head("System"),
 		err("A new version of Mail-in-a-Box is available. You are running version geseidl-v75-2204to2404-validated. The latest version is v75."),
-		{"type": "warning", "text": "Backups are disabled. It is recommended to enable a backup for your box.", "extra": []},
+		warn("Backups are disabled. It is recommended to enable a backup for your box."),
+		head("Network"),
+		warn("Mail-in-a-Box is configured to use a public DNS server. This is not supported by spamhaus. Could not determine whether this box's IPv4 address is blacklisted."),
 		head("geseidl.ro"),
+		warn("Mail-in-a-Box is configured to use a public DNS server. This is not supported by spamhaus. Could not determine whether the domain geseidl.ro is blacklisted."),
 		err("The nameservers set on this domain are incorrect. They are currently tim.ns.cloudflare.com; tina.ns.cloudflare.com."),
 		err("This domain should resolve to this box's IP address (A 82.79.229.146) ... currently resolves to 104.26.3.65."),
 		err("MTA-STS policy is missing: STSFetchResult.NONE"),
