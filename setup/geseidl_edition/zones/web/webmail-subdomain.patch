@@ -1,0 +1,29 @@
+diff --git a/management/dns_update.py b/management/dns_update.py
+index d6aeb9c..06096eb 100755
+--- a/management/dns_update.py
++++ b/management/dns_update.py
+@@ -259,6 +259,7 @@ def build_zone(domain, domain_properties, additional_records, env, is_zone=True)
+ 		if domain.startswith("mta-sts."): a_expl = "Optional. MTA-STS Policy Host serving /.well-known/mta-sts.txt."
+ 		if domain.startswith("autoconfig."): a_expl = "Provides email configuration autodiscovery support for Thunderbird Autoconfig."
+ 		if domain.startswith("autodiscover."): a_expl = "Provides email configuration autodiscovery support for Z-Push ActiveSync Autodiscover."
++		if domain.startswith("mail."): a_expl = f"Optional. Provides per-domain webmail access at https://{domain}/mail/ (Roundcube)."
+ 	defaults = [
+ 		(None,  "A",    env["PUBLIC_IP"], a_expl),
+ 		(None,  "AAAA", env.get('PUBLIC_IPV6'), f"Optional. Sets the IPv6 address that {domain} resolves to, e.g. for web hosting. (It is not necessary for receiving mail on this domain.)"),
+diff --git a/management/web_update.py b/management/web_update.py
+index 7ed99db..435a0d9 100644
+--- a/management/web_update.py
++++ b/management/web_update.py
+@@ -31,6 +31,12 @@ def get_web_domains(env, include_www_redirects=True, include_auto=True, exclude_
+ 		domains |= {'autoconfig.' + maildomain for maildomain in get_mail_domains(env, users_only=True)}
+ 		domains |= {'autodiscover.' + maildomain for maildomain in get_mail_domains(env, users_only=True)}
+ 
++		# 'mail.' for per-domain webmail access. Each domain with user accounts
++		# gets https://mail.<domain>/mail/ (Roundcube) served with its own TLS
++		# certificate, so clients on shared hosting can use a branded webmail URL
++		# instead of the box's PRIMARY_HOSTNAME. Served via nginx-alldomains.conf.
++		domains |= {'mail.' + maildomain for maildomain in get_mail_domains(env, users_only=True)}
++
+ 		# 'mta-sts.' for MTA-STS support for all domains that have email addresses.
+ 		domains |= {'mta-sts.' + maildomain for maildomain in get_mail_domains(env)}
+ 

@@ -1,0 +1,17 @@
+diff --git a/setup/webmail.sh b/setup/webmail.sh
+index b271391..63c1f82 100644
+--- a/setup/webmail.sh
++++ b/setup/webmail.sh
+@@ -132,7 +132,11 @@ cat > $RCM_CONFIG <<EOF;
+    ),
+  );
+ \$config['support_url'] = 'https://mailinabox.email/';
+-\$config['product_name'] = '$PRIMARY_HOSTNAME Webmail';
++# Per-domain webmail branding: show the host the user actually visited
++# (e.g. "mail.asociatiahcd.ro Webmail") instead of always PRIMARY_HOSTNAME,
++# since one Roundcube instance serves every hosted domain. HTTP_HOST is
++# user-controlled, so validate it as a hostname and fall back to PRIMARY.
++\$config['product_name'] = (isset(\$_SERVER['HTTP_HOST']) && preg_match('/^[A-Za-z0-9.-]+\$/', \$_SERVER['HTTP_HOST'])) ? \$_SERVER['HTTP_HOST'].' Webmail' : '$PRIMARY_HOSTNAME Webmail';
+ \$config['cipher_method'] = 'AES-256-CBC'; # persistent login cookie and potentially other things
+ \$config['des_key'] = '$SECRET_KEY'; # 37 characters -> ~256 bits for AES-256, see above
+ \$config['plugins'] = array('html5_notifier', 'archive', 'zipdownload', 'password', 'managesieve', 'jqueryui', 'persistent_login', 'carddav');

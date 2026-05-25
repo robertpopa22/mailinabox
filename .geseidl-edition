@@ -1,12 +1,13 @@
 # Geseidl Edition overlay manifest.
 # Prezenta acestui fisier = overlay activ. Vezi management/geseidl_edition/OVERLAY.md
 edition: geseidl
-overlay_version: 0.5.0
+overlay_version: 0.6.0
 upstream_base: v75
 zones:
   - status
   - dns
   - ssl
   - mail
+  - web
   # - spam   (de migrat)
-  # - web    (de migrat)
+
