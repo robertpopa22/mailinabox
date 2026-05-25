@@ -15,11 +15,61 @@ Activ doar daca markerul .geseidl-edition exista (vezi manifest.py).
 
 import os
 import sys
+import json
+import hashlib
+import datetime
 
 MARK_START = "# >>> GESEIDL EDITION OVERLAY >>>"
 MARK_END = "# <<< GESEIDL EDITION OVERLAY <<<"
 
 MGMT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+STAMP_FILE = os.path.join(PKG_DIR, ".deployed")
+
+
+def compute_fingerprint():
+	"""sha256 peste sursa overlay (toate .py + zones). Identifica exact ce ruleaza."""
+	h = hashlib.sha256()
+	files = []
+	for root, dirs, names in os.walk(PKG_DIR):
+		dirs[:] = [d for d in dirs if d != "__pycache__"]
+		for n in sorted(names):
+			if n.endswith(".py"):
+				files.append(os.path.join(root, n))
+	for path in sorted(files):
+		rel = os.path.relpath(path, PKG_DIR).replace("\\", "/")
+		h.update(rel.encode())
+		with open(path, "rb") as f:
+			h.update(f.read())
+	return h.hexdigest()
+
+
+def overlay_version():
+	sys.path.insert(0, MGMT_DIR)
+	from geseidl_edition import manifest
+	return manifest.load_manifest().get("overlay_version") or "?"
+
+
+def write_stamp():
+	stamp = {
+		"overlay_version": overlay_version(),
+		"fingerprint": compute_fingerprint(),
+		"applied_utc": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+	}
+	try:
+		with open(STAMP_FILE, "w", encoding="utf-8") as f:
+			json.dump(stamp, f, indent=2)
+	except OSError:
+		pass
+	return stamp
+
+
+def read_stamp():
+	try:
+		with open(STAMP_FILE, encoding="utf-8") as f:
+			return json.load(f)
+	except (OSError, ValueError):
+		return None
 
 
 def _t(s):
@@ -146,11 +196,29 @@ def remove_hook(hook):
 	return "not-removed"
 
 
+def cmd_version():
+	man_ver = overlay_version()
+	fp = compute_fingerprint()
+	print(f"Geseidl Edition overlay v{man_ver}")
+	print(f"  fingerprint: {fp[:12]} ({fp})")
+	st = read_stamp()
+	if st:
+		match = "MATCH" if st.get("fingerprint") == fp else "DRIFT (sursa difera de ce s-a aplicat ultima data!)"
+		print(f"  deployed:    v{st.get('overlay_version')} @ {st.get('applied_utc')} -> {match}")
+	else:
+		print("  deployed:    (fara stamp; ruleaza 'apply')")
+
+
 def cmd_status():
 	sys.path.insert(0, MGMT_DIR)
 	from geseidl_edition import manifest
 	man = manifest.load_manifest()
 	print(f"marker: {man['path']} (active={man['active']}, zones={man['zones']})")
+	print(f"overlay: v{man.get('overlay_version')}  fingerprint={compute_fingerprint()[:12]}")
+	st = read_stamp()
+	if st:
+		print(f"deployed: v{st.get('overlay_version')} @ {st.get('applied_utc')} "
+			f"({'match' if st.get('fingerprint') == compute_fingerprint() else 'DRIFT'})")
 	for h in HOOKS:
 		path = os.path.join(MGMT_DIR, h["file"])
 		try:
@@ -163,6 +231,8 @@ def cmd_status():
 def cmd_apply():
 	for h in HOOKS:
 		print(f"{h['name']}: {apply_hook(h)}")
+	stamp = write_stamp()
+	print(f"stamp: v{stamp['overlay_version']} fp={stamp['fingerprint'][:12]} @ {stamp['applied_utc']}")
 
 
 def cmd_remove():
@@ -223,6 +293,8 @@ def main(argv):
 		cmd_remove()
 	elif cmd == "status":
 		cmd_status()
+	elif cmd == "version":
+		cmd_version()
 	elif cmd == "selftest":
 		cmd_selftest()
 	else:

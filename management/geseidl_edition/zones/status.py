@@ -42,8 +42,9 @@ _VER_MARKERS = (
 )
 
 
-def _version_badge(env):
+def _version_badge(env, manifest=None):
 	"""Returneaza (kind, text, extra) pentru linia de versiune fork-aware."""
+	ov = (manifest or {}).get("overlay_version") or "?"
 	this_ver = latest = base = None
 	try:
 		from status_checks import what_version_is_this, get_latest_miab_version
@@ -57,7 +58,7 @@ def _version_badge(env):
 
 	m = re.match(r"geseidl[-_](v[0-9][0-9.]*)", this_ver or "", re.I)
 	base = m.group(1) if m else None
-	logo = [{"text": f"◈ Mail-in-a-Box {EDITION} — overlay activ", "monospace": True}]
+	logo = [{"text": f"◈ Mail-in-a-Box {EDITION} v{ov} — overlay activ", "monospace": True}]
 
 	if base and latest and base == latest:
 		return ("ok",
@@ -184,7 +185,7 @@ def process_sections(sections, env, pool, manifest):
 		name = (section["name"] or "")
 		if name == "System":
 			# inlocuieste linia de versiune cu badge-ul fork
-			kind, text, extra = _version_badge(env)
+			kind, text, extra = _version_badge(env, manifest)
 			replaced = False
 			for item in section["items"]:
 				if item["kind"] in ("ok", "error", "warning") and any(mk_ in item["text"] for mk_ in _VER_MARKERS):

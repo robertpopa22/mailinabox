@@ -39,7 +39,8 @@ def _strip_comment(line):
 def load_manifest(start=None):
 	"""Parse the manifest. Returns a dict with keys: edition, upstream_base, zones, active, path."""
 	path = find_marker(start)
-	data = {"edition": None, "upstream_base": None, "zones": [], "active": False, "path": path}
+	data = {"edition": None, "overlay_version": None, "upstream_base": None,
+		"zones": [], "active": False, "path": path}
 	if not path:
 		return data
 	data["active"] = True
@@ -64,7 +65,7 @@ def load_manifest(start=None):
 						if val.startswith("[") and val.endswith("]"):
 							data["zones"] = [z.strip() for z in val[1:-1].split(",") if z.strip()]
 							in_zones = False
-					elif key in ("edition", "upstream_base"):
+					elif key in ("edition", "upstream_base", "overlay_version"):
 						data[key] = val
 	except OSError:
 		pass
