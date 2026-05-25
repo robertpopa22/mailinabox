@@ -1,0 +1,10 @@
+# Geseidl Edition overlay — artefacte executate pe Linux: FORTAM LF.
+# Fara asta, un `git clone` pe Windows (autocrlf=true) stocheaza CRLF in blob,
+# iar pe serverul Linux scripturile bash dau erori `\r` si patch-urile esueaza
+# (line-ending mismatch vs sursa LF). Reguli SCOPED (nu ating fisiere upstream).
+setup/geseidl_edition/**/*.sh      text eol=lf
+setup/geseidl_edition/*.sh         text eol=lf
+setup/geseidl_edition/**/*.patch   text eol=lf
+setup/rspamd.sh                    text eol=lf
+management/geseidl_edition/**/*.py text eol=lf
+management/geseidl_edition/*.py    text eol=lf
