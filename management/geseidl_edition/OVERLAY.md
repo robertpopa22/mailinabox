@@ -68,7 +68,7 @@ Toate customizările Geseidl, grupate. Sursă: feature branches existente + chec
 | **status** | badge versiune fork, NS/glue/resolve/MX/DNSSEC re-verificate public, site-live, MTA-STS real, **Spamhaus DQS**, backup extern | runtime | **implementat (v0.2.0)** |
 | **dns** | resolver → `127.0.0.1` (bind9 local) + spamhaus exception zones, idempotent, verify+rollback | provisioning (bind9) | **implementat (v0.2.0)** |
 | **ssl** | cert-provisioning resolve-check pe DNS public (patch idempotent) | provisioning (patch) | **implementat (v0.4.0)** |
-| **mail** | arhiva email (`always_bcc`) cod-gestionată din settings.yaml | provisioning | **implementat (v0.5.0)** |
+| **mail** | arhiva email (`always_bcc`) cod-gestionată din settings.yaml + **restricție acces IMAP per-cont la source IP** (Dovecot `allow_nets`, tabel sidecar `geseidl_imap_restrictions` + CLI `imap_restrict.py`) | provisioning | **implementat (v0.5.0 / allow_nets v0.9.0)** |
 | **web** | webmail-subdomain (`mail.<domeniu>/mail/` + branding HTTP_HOST), patch-uri idempotente | provisioning (patch) | **implementat (v0.6.0)** |
 | **spam** | rspamd: fișiere noi fork-tracked (installer 446l `setup/rspamd.sh` + UI `system-spam.html`) + 4 patch-uri integrare (mail-postfix/spamassassin/daemon-api/index, signature-gate, dry-run+revert) | provisioning + runtime | **implementat (v0.8.0)** |
 
