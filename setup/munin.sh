@@ -37,6 +37,16 @@ EOF
 chown munin /var/log/munin/munin-cgi-html.log
 chown munin /var/log/munin/munin-cgi-graph.log
 
+# We run munin-cgi-graph and munin-cron as the 'munin' user (see further below and
+# munin_start.sh), so the dynamic graph cache under /var/lib/munin/cgi-tmp ends up owned
+# by munin:munin. However the stock Debian 'munin' package ships /etc/cron.d/munin with a
+# daily cleanup job that runs as the 'www-data' user. Because www-data is not in the munin
+# group it cannot delete those files and the cron job fails with "Permission denied",
+# which makes cron email the (root) administrator every day. Add www-data to the munin
+# group so the cgi-tmp cleanup succeeds silently. (The cgi-tmp dirs are group-writable,
+# so group membership is enough to clean them.)
+usermod -aG munin www-data
+
 # ensure munin-node knows the name of this machine
 # and reduce logging level to warning
 tools/editconf.py /etc/munin/munin-node.conf -s \
