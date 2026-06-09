@@ -19,7 +19,8 @@ apt_install duplicity python3-pip virtualenv certbot rsync
 # b2sdk is used for backblaze backups.
 # boto3 is used for amazon aws backups.
 # Both are installed outside the pipenv, so they can be used by duplicity
-hide_output pip3 install --upgrade b2sdk boto3
+# GESEIDL SOVEREIGN FORK: --break-system-packages for Ubuntu 24.04 PEP 668 (see questions.sh).
+hide_output pip3 install --break-system-packages --upgrade b2sdk boto3
 
 # Create a virtualenv for the installation of Python 3 packages
 # used by the management daemon.
