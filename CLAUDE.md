@@ -30,7 +30,7 @@ Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspam
 | **Branch deploiat (live)** | `main` (commit 8564f8f la 2026-06-08) — NU `geseidl-edition`. Overlay-ul geseidl e cherry-picked pe main. |
 | **Deploy** | MAIL02 (10.0.1.89), Hyper-V VM "GES-MAIL02" pe **GES-S11** (migrat de pe S00; copia S00 = Off) |
 | **OS live** | **Ubuntu 24.04.4 LTS** — baseline-ul nostru (fork suveran). `preflight.sh` patch-uit sa accepte 24.04 (DONE 2026-06-09). |
-| **PHP** | **8.2** (upgrade 2026-06-09 de pe 8.0 EOL). `PHP_VER` in `functions.sh` override-abil din env. `php8.0-fpm` dezactivat. |
+| **PHP** | **8.3** (2026-06-09: 8.0→8.2→8.3; 8.0/8.2 purjate complet, doar `/etc/php/8.3`). `PHP_VER` override-abil din env — lantul NC 26→33 cere `PHP_VER=8.2` (NC26 caps 8.2). |
 | **SSH** | `ssh -i ~/.ssh/ges-mail01 dit2022@10.0.1.89` (prin `NET-ADMIN/tools/secure_connect.py --target ges-mail02 --sudo`) |
 | **Resurse** | 44 vCPU, ~47 GB RAM (verificat 2026-06-09) |
 | **Nextcloud** | **33.0.5** (contacts 8.5.1, calendar 6.4.2, user_external 4.0.0) — upgrade 26→33 la 2026-06-09; DB SQLite `/home/user-data/owncloud/owncloud.db`. Apps din **release-asset** (nu `/archive/`). |
@@ -127,7 +127,7 @@ cd /root/mailinabox && bash setup/nextcloud.sh   # ruleaza DOAR zona nextcloud, 
 
 **Stratul 3 — REZOLVAT 2026-06-09** (era singurul risc activ):
 - **Nextcloud 26.0.13 → 33.0.5** — linia 26 era EOL mar-2024, expusa public pe `/cloud`. Acum pe linie suportata (33, suport pana ~2027). Upgrade prin lant secvential 26→27→…→33 (`setup/nextcloud.sh`).
-- **PHP 8.0 → 8.2** — 8.0 era EOL nov-2023. `php8.0-fpm` dezactivat. (8.2 e deprecated in NC 33 dar suportat; bump la 8.3 = follow-up nepresant, 8.2 EOL dec-2026.)
+- **PHP 8.0 → 8.2 → 8.3** — 8.0 EOL nov-2023, 8.2 deprecated in NC33. Acum **8.3** (recomandat NC33); pachetele php8.0\* + php8.2\* **purjate** (doar 8.3 ramane). Roundcube bumpat 1.6.15→**1.6.16** (security LTS); z-push 2.7.6 = ultima.
 
 ### Decizie strategica OS + NC — REZOLVAT + EXECUTAT prin FORK SUVERAN (2026-06-09)
 
@@ -137,7 +137,7 @@ Context verificat la sursa: upstream MiaB v76 = ÎNCĂ 22.04-only + NC 26 + PHP 
 
 **Executat (commit-uri `d54d068..fd6a9c7`):** preflight 24.04; PHP 8.0→8.2; lant `nextcloud.sh` 26→33 (SHA1 pinned, apps din release-asset); fix-uri 24.04/systemd255 (pip `--break-system-packages`, scos `systemctl link`, rspamd training non-fatal+run-once, nginx upstream php8.2). **PHP 8.2 acopera tot lantul 26→33** (single-stage). Detalii + catalog fix-uri reutilizabil: memoria `project_mailinabox_sovereign_fork` + `NET-ADMIN/GESEIDL/GES-MAIL01/GES-MAIL02.log.md` (2026-06-09 12:15).
 
-**Follow-up nepresant:** purge pachete `php8.0*` (21, dezactivate); evaluare bump PHP 8.2→8.3; decuplare NC intr-un VM standalone (durabil — NC nu mai depinde de pin-ul MiaB).
+**Follow-up:** ~~purge php8.0~~ ✅ (php8.0+8.2 purjate 2026-06-09); ~~bump 8.3~~ ✅; ~~roundcube bump~~ ✅ (1.6.16). Ramas: decuplare NC intr-un VM standalone (durabil — NC nu mai depinde de pin-ul MiaB).
 
 ---
 
