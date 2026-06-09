@@ -429,13 +429,20 @@ systemctl stop spamassassin 2>/dev/null
 systemctl disable spamassassin 2>/dev/null
 
 # === INITIAL BAYES TRAINING ===
-
-if [ -d "$STORAGE_ROOT/mail/mailboxes" ]; then
-	echo "Training rspamd Bayes from existing mailboxes..."
-	find "$STORAGE_ROOT/mail/mailboxes" -path "*/cur/*" -type f -print0 2>/dev/null | \
-		head -z -n 5000 | xargs -0 -P4 -I{} rspamc learn_ham {} 2>/dev/null
-	find "$STORAGE_ROOT/mail/mailboxes" -path "*/.Spam/cur/*" -type f -print0 2>/dev/null | \
-		head -z -n 5000 | xargs -0 -P4 -I{} rspamc learn_spam {} 2>/dev/null
+# GESEIDL SOVEREIGN FORK: run-once + non-fatal. rspamc exits non-zero on "all learn
+# conditions denied" (already-balanced classifier) and `head -z` closes the pipe early
+# (SIGPIPE on find); with `set -o pipefail` (functions.sh) that aborted the ENTIRE setup
+# mid-run. Guard with a marker so re-runs skip the slow 5000-file scan, and wrap each
+# pipeline in `( ... ) || true` so training never stops setup. Ongoing learning is handled
+# by autolearn + the IMAPSieve learn hooks anyway.
+RSPAMD_TRAIN_MARKER="$STORAGE_ROOT/mail/.rspamd-bayes-trained"
+if [ -d "$STORAGE_ROOT/mail/mailboxes" ] && [ ! -f "$RSPAMD_TRAIN_MARKER" ]; then
+	echo "Training rspamd Bayes from existing mailboxes (one-time)..."
+	( find "$STORAGE_ROOT/mail/mailboxes" -path "*/cur/*" -type f -print0 2>/dev/null | \
+		head -z -n 5000 | xargs -0 -P4 -I{} rspamc learn_ham {} 2>/dev/null ) || true
+	( find "$STORAGE_ROOT/mail/mailboxes" -path "*/.Spam/cur/*" -type f -print0 2>/dev/null | \
+		head -z -n 5000 | xargs -0 -P4 -I{} rspamc learn_spam {} 2>/dev/null ) || true
+	touch "$RSPAMD_TRAIN_MARKER"
 	echo "Bayes training complete."
 fi
 
