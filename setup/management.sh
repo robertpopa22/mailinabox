@@ -106,7 +106,11 @@ exec gunicorn -b 127.0.0.1:10222 -w 1 --timeout 630 wsgi:app
 EOF
 chmod +x $inst_dir/start
 cp --remove-destination conf/mailinabox.service /lib/systemd/system/mailinabox.service # target was previously a symlink so remove it first
-hide_output systemctl link -f /lib/systemd/system/mailinabox.service
+# GESEIDL SOVEREIGN FORK (Ubuntu 24.04 / systemd 255): the unit already lives in the standard
+# path /lib/systemd/system, so `systemctl link` marks it a "linked unit" which systemd then
+# REFUSES to `enable` ("Refusing to operate on alias name or linked unit file" /
+# "Too many levels of symbolic links"). Drop the link step, clear any stale /etc symlink, enable directly.
+rm -f /etc/systemd/system/mailinabox.service
 hide_output systemctl daemon-reload
 hide_output systemctl enable mailinabox.service
 
