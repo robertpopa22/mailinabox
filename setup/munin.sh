@@ -75,7 +75,10 @@ mkdir -p /var/lib/munin-node/plugin-state/
 ln -sf "$PWD/management/munin_start.sh" /usr/local/lib/mailinabox/munin_start.sh
 chmod 0744 /usr/local/lib/mailinabox/munin_start.sh
 cp --remove-destination conf/munin.service /lib/systemd/system/munin.service # target was previously a symlink so remove first
-hide_output systemctl link -f /lib/systemd/system/munin.service
+# GESEIDL SOVEREIGN FORK (Ubuntu 24.04 / systemd 255): unit is in standard path /lib, so
+# `systemctl link` makes it a "linked unit" systemd refuses to enable. Drop link, clear stale
+# /etc symlink, enable directly (same fix as management.sh).
+rm -f /etc/systemd/system/munin.service
 hide_output systemctl daemon-reload
 hide_output systemctl unmask munin.service
 hide_output systemctl enable munin.service
