@@ -37,11 +37,11 @@ nextcloud_hash=321580c08d769d69d9af851d9fa3bae189577a7c
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/contacts
 contacts_ver=8.5.1
-contacts_hash=fd20f82fd41c55bb92e16a4ee8f537e13765d036
+contacts_hash=dd8c6ee70a505e51f521dfba2dff5f3d7da1adf6
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/calendar
 calendar_ver=6.4.2
-calendar_hash=887cb300718f01a7e54dad7788d8a8c2027003a9
+calendar_hash=b014219097038e424501d277b7264f752c0eff2b
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/user_external
 user_external_ver=4.0.0
@@ -105,7 +105,9 @@ InstallNextcloud() {
 	# their github repositories.
 	mkdir -p /usr/local/lib/owncloud/apps
 
-	wget_verify "https://github.com/nextcloud-releases/contacts/archive/refs/tags/v$version_contacts.tar.gz" "$hash_contacts" /tmp/contacts.tgz
+	# GESEIDL: use the RELEASE-ASSET tarball (built, includes vendor/ + compiled assets),
+	# NOT /archive/ (source only, missing vendor/ => AppPathNotFound/autoload errors). Extracts to bare 'contacts'.
+	wget_verify "https://github.com/nextcloud-releases/contacts/releases/download/v$version_contacts/contacts-v$version_contacts.tar.gz" "$hash_contacts" /tmp/contacts.tgz
 	tar xf /tmp/contacts.tgz -C /usr/local/lib/owncloud/apps/
 	# GESEIDL: github /archive/ tarballs extract to a versioned dir (contacts-X.Y.Z); Nextcloud
 	# resolves apps by bare id ('contacts'), so a versioned dir => AppPathNotFoundException once
@@ -116,7 +118,7 @@ InstallNextcloud() {
 	fi
 	rm /tmp/contacts.tgz
 
-	wget_verify "https://github.com/nextcloud-releases/calendar/archive/refs/tags/v$version_calendar.tar.gz" "$hash_calendar" /tmp/calendar.tgz
+	wget_verify "https://github.com/nextcloud-releases/calendar/releases/download/v$version_calendar/calendar-v$version_calendar.tar.gz" "$hash_calendar" /tmp/calendar.tgz
 	tar xf /tmp/calendar.tgz -C /usr/local/lib/owncloud/apps/
 	if [ -d "/usr/local/lib/owncloud/apps/calendar-$version_calendar" ]; then
 		rm -rf /usr/local/lib/owncloud/apps/calendar
@@ -255,31 +257,31 @@ if [ ! -d /usr/local/lib/owncloud/ ] || [[ ! ${CURRENT_NEXTCLOUD_VER} =~ ^$nextc
 		# mid-chain and the next step replaces it. Only the final NC 33 trio (contacts 8.5.1 /
 		# calendar 6.4.2 / user_external 4.0.0, set at top) must be exact.
 		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^25 ]]; then
-			InstallNextcloud 26.0.13 d5c10b650e5396d5045131c6d22c02a90572527c 5.5.3 799550f38e46764d90fa32ca1a6535dccd8316e5 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			InstallNextcloud 26.0.13 d5c10b650e5396d5045131c6d22c02a90572527c 5.5.3 b234ab410480a4106176a28f39c9b27f471d0473 4.7.20 12d876904e227156e39ca4335b18481b42a6d00f 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
 			CURRENT_NEXTCLOUD_VER="26.0.13"
 		fi
 		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^26 ]]; then
-			InstallNextcloud 27.1.11 9f30c01a021c2e5a9e7baff119955afb3c552ebc 5.5.3 799550f38e46764d90fa32ca1a6535dccd8316e5 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			InstallNextcloud 27.1.11 9f30c01a021c2e5a9e7baff119955afb3c552ebc 5.5.3 b234ab410480a4106176a28f39c9b27f471d0473 4.7.20 12d876904e227156e39ca4335b18481b42a6d00f 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
 			CURRENT_NEXTCLOUD_VER="27.1.11"
 		fi
 		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^27 ]]; then
-			InstallNextcloud 28.0.14 8a9edcfd26d318eb7d1cfa44d69796f2d1098a80 6.0.6 14b8b3053eb4d47ad46ca202d6ada072c57ebe32 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			InstallNextcloud 28.0.14 8a9edcfd26d318eb7d1cfa44d69796f2d1098a80 6.0.6 9c40adc5f492d7ae4da40bfe01e3d682416d0b68 4.7.20 12d876904e227156e39ca4335b18481b42a6d00f 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
 			CURRENT_NEXTCLOUD_VER="28.0.14"
 		fi
 		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^28 ]]; then
-			InstallNextcloud 29.0.16 ceb3014aaddc70d3074d2c69bc6afc76eb1aeff0 6.0.6 14b8b3053eb4d47ad46ca202d6ada072c57ebe32 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			InstallNextcloud 29.0.16 ceb3014aaddc70d3074d2c69bc6afc76eb1aeff0 6.0.6 9c40adc5f492d7ae4da40bfe01e3d682416d0b68 4.7.20 12d876904e227156e39ca4335b18481b42a6d00f 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
 			CURRENT_NEXTCLOUD_VER="29.0.16"
 		fi
 		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^29 ]]; then
-			InstallNextcloud 30.0.14 0eb41c778b639e9497a104d5cf0234cdee8e4b95 7.3.17 7b1d3961f9a8c846419e0effb1bd42956ffafe81 5.5.18 5728ae56cea3ab39e70fb328dd6dc7269e58678a 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			InstallNextcloud 30.0.14 0eb41c778b639e9497a104d5cf0234cdee8e4b95 7.3.17 3db5fda45255968c60f5646ccc4b6d2c26db45b5 5.5.18 7ee452d0559b72d67c171b4d21e62e8e5bd354f1 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
 			CURRENT_NEXTCLOUD_VER="30.0.14"
 		fi
 		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^30 ]]; then
-			InstallNextcloud 31.0.9 93b7197f24afbacfbdcf25120e2dc939696c704f 7.3.17 7b1d3961f9a8c846419e0effb1bd42956ffafe81 5.5.18 5728ae56cea3ab39e70fb328dd6dc7269e58678a 4.0.0 214497dd8691f279ba3740797c565310f0793054
+			InstallNextcloud 31.0.9 93b7197f24afbacfbdcf25120e2dc939696c704f 7.3.17 3db5fda45255968c60f5646ccc4b6d2c26db45b5 5.5.18 7ee452d0559b72d67c171b4d21e62e8e5bd354f1 4.0.0 214497dd8691f279ba3740797c565310f0793054
 			CURRENT_NEXTCLOUD_VER="31.0.9"
 		fi
 		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^31 ]]; then
-			InstallNextcloud 32.0.3 bcda95e8565f4ca75fb66f1e3c2a7d4f538b6b9f 8.3.12 24c63367a1f093ac89c7d388e4a103b8fad4e325 6.4.2 887cb300718f01a7e54dad7788d8a8c2027003a9 4.0.0 214497dd8691f279ba3740797c565310f0793054
+			InstallNextcloud 32.0.3 bcda95e8565f4ca75fb66f1e3c2a7d4f538b6b9f 8.3.12 99ddb2068e3532eccd6acffd54e5cf18a1110783 6.4.2 b014219097038e424501d277b7264f752c0eff2b 4.0.0 214497dd8691f279ba3740797c565310f0793054
 			CURRENT_NEXTCLOUD_VER="32.0.3"
 		fi
 		# <<< GESEIDL SOVEREIGN FORK <<<
