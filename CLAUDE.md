@@ -4,6 +4,22 @@
 
 ---
 
+## ⭐ DECIZIE DE BAZĂ — FORK SUVERAN (2026-06-09)
+
+> **Plecăm pe cont propriu.** `main` (robertpopa22/mailinabox) e **baseline-ul AUTORITATIV Geseidl**, NU o oglindă a upstream.
+
+- **NU mai facem `git merge upstream/main`.** Upstream (`mail-in-a-box/mailinabox`) devine doar un **remote de referință** din care **cherry-pick selectiv** (fix-uri securitate, features utile), evaluat manual caz-cu-caz.
+- **Eliberați de constrângerile upstream:** OS (Ubuntu 24.04+), Nextcloud (versiune **suportată**), PHP (8.2/8.3) — le decidem NOI, pe ritmul nostru. Upstream rămâne deliberat blocat pe 22.04 / NC 26 / PHP 8.0; noi NU.
+- **Implicație (responsabilitate):** preluăm 100% mentenanța + securitatea — nu mai vine "gratis" de la upstream. De aici **governance strict obligatoriu**: preflight propriu, verificări post-change, runbook-uri (vezi secțiunile de jos).
+- **Overlay-ul `geseidl_edition/` rămâne** ca igienă (customizări modulare, izolate), dar scopul se mută de la "minimizează conflicte la merge upstream" → "ține codul nostru separat de codul moștenit din upstream".
+
+**Consecințe concrete de execuție (sesiune nouă, cu checkpoint):**
+1. Patch `setup/preflight.sh` → acceptă 24.04 (suntem suverani; nu mai e "snowflake against upstream", e baseline-ul nostru).
+2. Bump `setup/nextcloud.sh` → NC versiune suportată (32/33) + `PHP_VER` 8.2/8.3.
+3. Cherry-pick din upstream doar ce e relevant pt securitate/funcțional.
+
+---
+
 ## Overview
 
 Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspamd, arhivare email).
@@ -13,8 +29,8 @@ Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspam
 | **Repo** | robertpopa22/mailinabox (fork upstream mail-in-a-box/mailinabox) |
 | **Branch deploiat (live)** | `main` (commit 8564f8f la 2026-06-08) — NU `geseidl-edition`. Overlay-ul geseidl e cherry-picked pe main. |
 | **Deploy** | MAIL02 (10.0.1.89), Hyper-V VM "GES-MAIL02" pe **GES-S11** (migrat de pe S00; copia S00 = Off) |
-| **OS live** | ⚠ **Ubuntu 24.04.4 LTS** — upstream MiaB (si acest fork) suporta DOAR 22.04. Vezi "OS 24.04 — upgrade blocat". |
-| **PHP** | 8.0 (pinat pt Nextcloud; nu 8.3 din 24.04) |
+| **OS live** | **Ubuntu 24.04.4 LTS** — baseline-ul nostru (fork suveran). `preflight.sh` upstream blocheaza 24.04 → patch propriu de aplicat (vezi DECIZIE DE BAZĂ). |
+| **PHP** | 8.0 acum (= upstream); **de urcat la 8.2/8.3** sub modelul suveran, pt NC suportat |
 | **SSH** | `ssh -i ~/.ssh/ges-mail01 dit2022@10.0.1.89` (prin `NET-ADMIN/tools/secure_connect.py --target ges-mail02 --sudo`) |
 | **Resurse** | 44 vCPU, ~47 GB RAM (verificat 2026-06-09) |
 | **Nextcloud** | 26.0.13 (contacts 5.5.4, calendar 4.7.20, user_external 3.4.0); DB SQLite `/home/user-data/owncloud/owncloud.db` |
@@ -70,9 +86,9 @@ sudo systemctl restart mailinabox
 
 ## Reguli
 
-- **Testează pe MAIL02** înainte de merge în `geseidl-edition`
-- Feature branches rămân independente — merge doar în `geseidl-edition`, nu între ele
-- Verifică `NET-ADMIN/GESEIDL/` pentru detalii infrastructură MAIL02
+- **Lucru pe `main`** (baseline suveran). Customizari → în `geseidl_edition/` (overlay zone), NU inline în upstream. Vezi OVERLAY.md.
+- **Cherry-pick din upstream** (`mail-in-a-box/mailinabox`) selectiv, evaluat manual — NU `git merge upstream/main`.
+- **Testează pe clonă** înainte de productie (MAIL02). Verifică `NET-ADMIN/GESEIDL/` pentru detalii infrastructură MAIL02.
 
 ---
 
@@ -90,10 +106,7 @@ Box-ul a fost upgradat OS 22.04→24.04 candva; serviciile MiaB ruleaza, dar **s
 - Update-urile apt/kernel intra prin `daily-reboot.timer` (02:30), DAR config-urile MiaB-managed (Nextcloud, rspamd, Postfix/Dovecot templates, certuri) NU se reaplica fara setup.
 - **Overlay-ul geseidl NU rezolva** gap-ul OS — acopera doar zonele lui (dns/nat/archive/rspamd/webmail). Nu patch-uieste preflight.
 
-**Optiuni strategice (decizie user — NU executa fara aprobare):**
-1. **Rebuild MAIL02 pe Ubuntu 22.04** (suportat oficial) — curat, dar migrare completa (mail+NC+config).
-2. **Forward-port fork la 24.04** — rebase pe versiune upstream MiaB care suporta 24.04 (v7x), re-aplica overlay. Proper long-term.
-3. **Status quo + mentenanta manuala per-componenta** (ca recuperarea NC din 2026-06-09) — fragil, fiecare componenta manual.
+**DECIS (2026-06-09) — fork suveran:** patch-uim `setup/preflight.sh` sa accepte 24.04 (e baseline-ul NOSTRU, vezi DECIZIE DE BAZĂ sus). NU rebuild pe 22.04 (upstream e blocat acolo, noi mergem inainte), NU "forward-port pe upstream care suporta 24.04" (nu exista — upstream v76 = inca 22.04-only). Testare pe clona inainte de productie fiindca `setup/*.sh` sunt testate de upstream doar pe 22.04.
 
 **Recuperare/mentenanta tintita pe componenta (workaround OS guard):** scripturile `setup/<componenta>.sh` (ex. `nextcloud.sh`) NU au guard OS (doar `preflight.sh`/`start.sh` il au) → se pot rula standalone:
 ```bash
@@ -120,17 +133,18 @@ cd /root/mailinabox && bash setup/nextcloud.sh   # ruleaza DOAR zona nextcloud, 
 
 **Lant upgrade NC** (fiecare treapta = `occ upgrade`, posibil bump PHP): 26 → 27 → 28 → 29 (→ 30/31). NU se sare versiune majora. Backup `owncloud.db` + `config.php` inainte de FIECARE treapta (vezi runbook recuperare jos).
 
-### Decizie strategica OS (pending aprobare user — NU executa)
+### Decizie strategica OS + NC — REZOLVAT prin FORK SUVERAN (2026-06-09)
 
-Upstream MiaB = **22.04-only confirmat** (preflight v76 hard-codeaza `VERSION_ID==22.04`, niciun roadmap 24.04). Optiuni:
+> Vezi "⭐ DECIZIE DE BAZĂ" (sus). Constrangerea upstream (22.04 / NC 26 / PHP 8.0) **nu ne mai leaga** — o ridicam noi.
 
-| Opt | Descriere | Pro | Contra |
-|-----|-----------|-----|--------|
-| **A. Patch preflight → 24.04** | 1-line guard geseidl care accepta 24.04 → setup re-ruleaza → strat 2 dezghetat | ieftin, rapid, pastreaza OS curent | **snowflake** — `setup/*.sh` scrise/testate pt pachete 22.04; pe 24.04 (PHP 8.3 default, versiuni Dovecot/Postfix diferite) setup poate strica. De ce upstream guardeaza. Risc pe productie |
-| **B. Blue-green rebuild pe 22.04** | box nou 22.04 curat → fork geseidl-edition → migrare backup/restore MiaB → cutover DNS | suportat oficial, valideaza DR, overlay-ul ride-uieste upstream cum e proiectat | scump (VM nou + fereastra cutover); 22.04 standard support → apr-2027 (runway ~10 luni → posibil alt migrate curand) |
-| **C. Status-quo + mentenanta manuala** | per-componenta (ca recovery NC 2026-06-09) | zero efort acum | fragil; strat 2 ramane inghetat indefinit |
+Context verificat la sursa: upstream MiaB v76 = ÎNCĂ 22.04-only (preflight hard `VERSION_ID==22.04`) + ÎNCĂ NC 26.0.13 + PHP 8.0. Forkul nostru era identic. NC 26 EOL (mar-2024) e un **plafon upstream**, nu un bug al nostru — dar acum suntem suverani si il depasim singuri.
 
-**Recomandare (Gemini xhigh + verificare la sursa):** **B pe termen lung** (revine pe sine suportate), DAR **stratul 3 (NC) se ataca ACUM independent** (opt A-light doar pt `nextcloud.sh`, fara setup complet) fiindca e singurul risc activ. Decizia A/B/C = a user-ului.
+**Plan sub model suveran (execuție sesiune nouă, checkpoint obligatoriu, blue-green pe componente riscante):**
+1. **Stratul 2 (app-layer dezghetat):** patch `setup/preflight.sh` → accepta 24.04 → `mailinabox`/setup ruleaza din nou pe baseline-ul nostru. Atentie: `setup/*.sh` testate de upstream pe 22.04 → testare pe clona inainte de productie.
+2. **Stratul 3 (NC la zi):** bump `setup/nextcloud.sh` (`nextcloud_ver` → versiune suportata 32/33; `PHP_VER` → 8.2/8.3). NC cere upgrade major secvential (26→27→…→32) SAU instalare curata NC nou + migrare date — decizie de implementare la executie.
+3. **Compensator interimar** (pana la upgrade NC): NC `/cloud` + DAV sunt PUBLICE (status.php 200 de pe IP public) → restrange UI web NC la LAN/VPN ca sa tai suprafata CVE EOL (atentie sync DAV mobil — decizie operationala).
+
+Riscul activ acum = NC 26 EOL expus public (vezi compensator). Restul (OS/app-layer) = stabil, fara presiune imediata.
 
 ---
 

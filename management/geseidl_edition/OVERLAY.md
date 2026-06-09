@@ -111,9 +111,11 @@ cert expiry pe subdomeniile servite (`mail.`/`autoconfig.`/`autodiscover.`), DNS
 
 ## Workflow upgrade upstream
 
+> ⚠ **FORK SUVERAN (2026-06-09):** NU mai facem `git merge upstream/main`. Upstream = sursa de **cherry-pick selectiv**. Vezi `CLAUDE.md` → "DECIZIE DE BAZĂ". Pasul 1 de mai jos = doar cand cherry-pick-uiesti un commit upstream anume.
+
 ```bash
-# 1. Aliniere cu upstream (curat)
-git fetch upstream && git merge upstream/main      # conflicte doar pe blocurile marcate (mici)
+# 1. Cherry-pick selectiv din upstream (NU merge complet)
+git fetch upstream && git cherry-pick <commit>     # doar fix-uri/features evaluate manual
 
 # 2. Reaplicare overlay (idempotent, citeste .geseidl-edition)
 python3 management/geseidl_edition/apply_overlay.py apply
