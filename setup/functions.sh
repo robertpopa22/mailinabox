@@ -5,7 +5,11 @@
 # -o pipefail: don't ignore errors in the non-last command in a pipeline
 set -euo pipefail
 
-PHP_VER=8.0
+# GESEIDL SOVEREIGN FORK: PHP version is overridable from the environment so the
+# Nextcloud upgrade chain can be driven stage-by-stage (e.g. PHP_VER=8.2 ./setup/nextcloud.sh).
+# Default bumped 8.0 -> 8.2 (8.0 EOL Nov 2023). PHP 8.2 spans the whole NC 26->33 chain;
+# steady-state is bumped to 8.3 after reaching NC 33.
+PHP_VER="${PHP_VER:-8.2}"
 
 function hide_output {
 	# This function hides the output of a command unless the command fails

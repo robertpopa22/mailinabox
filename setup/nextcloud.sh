@@ -21,8 +21,8 @@ echo "Installing Nextcloud (contacts/calendar)..."
 #   we automatically install intermediate versions as needed.
 # * The hash is the SHA1 hash of the ZIP package, which you can find by just running this script and
 #   copying it from the error message when it doesn't match what is below.
-nextcloud_ver=26.0.13
-nextcloud_hash=d5c10b650e5396d5045131c6d22c02a90572527c
+nextcloud_ver=33.0.5
+nextcloud_hash=321580c08d769d69d9af851d9fa3bae189577a7c
 
 # Nextcloud apps
 # --------------
@@ -36,16 +36,16 @@ nextcloud_hash=d5c10b650e5396d5045131c6d22c02a90572527c
 # the error message when it doesn't match what is below:
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/contacts
-contacts_ver=5.5.3
-contacts_hash=799550f38e46764d90fa32ca1a6535dccd8316e5
+contacts_ver=8.5.1
+contacts_hash=fd20f82fd41c55bb92e16a4ee8f537e13765d036
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/calendar
-calendar_ver=4.7.6
-calendar_hash=a995bca4effeecb2cab25f3bbeac9bfe05fee766
+calendar_ver=6.4.2
+calendar_hash=887cb300718f01a7e54dad7788d8a8c2027003a9
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/user_external
-user_external_ver=3.3.0
-user_external_hash=280d24eb2a6cb56b4590af8847f925c28d8d853e
+user_external_ver=4.0.0
+user_external_hash=214497dd8691f279ba3740797c565310f0793054
 
 # Developer advice (test plan)
 # ----------------------------
@@ -239,6 +239,39 @@ if [ ! -d /usr/local/lib/owncloud/ ] || [[ ! ${CURRENT_NEXTCLOUD_VER} =~ ^$nextc
 			InstallNextcloud 25.0.7 a5a565c916355005c7b408dd41a1e53505e1a080 5.3.0 4b0a6666374e3b55cfd2ae9b72e1d458b87d4c8c 4.4.2 21a42e15806adc9b2618760ef94f1797ef399e2f 3.2.0 a494073dcdecbbbc79a9c77f72524ac9994d2eec
 			CURRENT_NEXTCLOUD_VER="25.0.7"
 		fi
+		# >>> GESEIDL SOVEREIGN FORK: NC 26->33 chain (SHA1 pinned 2026-06-09) >>>
+		# Intermediate app versions are "good enough"; NC auto-disables any incompatible app
+		# mid-chain and the next step replaces it. Only the final NC 33 trio (contacts 8.5.1 /
+		# calendar 6.4.2 / user_external 4.0.0, set at top) must be exact.
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^25 ]]; then
+			InstallNextcloud 26.0.13 d5c10b650e5396d5045131c6d22c02a90572527c 5.5.3 799550f38e46764d90fa32ca1a6535dccd8316e5 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			CURRENT_NEXTCLOUD_VER="26.0.13"
+		fi
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^26 ]]; then
+			InstallNextcloud 27.1.11 9f30c01a021c2e5a9e7baff119955afb3c552ebc 5.5.3 799550f38e46764d90fa32ca1a6535dccd8316e5 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			CURRENT_NEXTCLOUD_VER="27.1.11"
+		fi
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^27 ]]; then
+			InstallNextcloud 28.0.14 8a9edcfd26d318eb7d1cfa44d69796f2d1098a80 6.0.6 14b8b3053eb4d47ad46ca202d6ada072c57ebe32 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			CURRENT_NEXTCLOUD_VER="28.0.14"
+		fi
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^28 ]]; then
+			InstallNextcloud 29.0.16 ceb3014aaddc70d3074d2c69bc6afc76eb1aeff0 6.0.6 14b8b3053eb4d47ad46ca202d6ada072c57ebe32 4.7.20 77ef4346241dc760db872be72e37204594fbd78b 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			CURRENT_NEXTCLOUD_VER="29.0.16"
+		fi
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^29 ]]; then
+			InstallNextcloud 30.0.14 0eb41c778b639e9497a104d5cf0234cdee8e4b95 7.3.17 7b1d3961f9a8c846419e0effb1bd42956ffafe81 5.5.18 5728ae56cea3ab39e70fb328dd6dc7269e58678a 3.4.0 7f9d8f4dd6adb85a0e3d7622d85eeb7bfe53f3b4
+			CURRENT_NEXTCLOUD_VER="30.0.14"
+		fi
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^30 ]]; then
+			InstallNextcloud 31.0.9 93b7197f24afbacfbdcf25120e2dc939696c704f 7.3.17 7b1d3961f9a8c846419e0effb1bd42956ffafe81 5.5.18 5728ae56cea3ab39e70fb328dd6dc7269e58678a 4.0.0 214497dd8691f279ba3740797c565310f0793054
+			CURRENT_NEXTCLOUD_VER="31.0.9"
+		fi
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^31 ]]; then
+			InstallNextcloud 32.0.3 bcda95e8565f4ca75fb66f1e3c2a7d4f538b6b9f 8.3.12 24c63367a1f093ac89c7d388e4a103b8fad4e325 6.4.2 887cb300718f01a7e54dad7788d8a8c2027003a9 4.0.0 214497dd8691f279ba3740797c565310f0793054
+			CURRENT_NEXTCLOUD_VER="32.0.3"
+		fi
+		# <<< GESEIDL SOVEREIGN FORK <<<
 	fi
 
 	InstallNextcloud $nextcloud_ver $nextcloud_hash $contacts_ver $contacts_hash $calendar_ver $calendar_hash $user_external_ver $user_external_hash
