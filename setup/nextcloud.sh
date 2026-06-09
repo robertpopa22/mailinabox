@@ -107,10 +107,21 @@ InstallNextcloud() {
 
 	wget_verify "https://github.com/nextcloud-releases/contacts/archive/refs/tags/v$version_contacts.tar.gz" "$hash_contacts" /tmp/contacts.tgz
 	tar xf /tmp/contacts.tgz -C /usr/local/lib/owncloud/apps/
+	# GESEIDL: github /archive/ tarballs extract to a versioned dir (contacts-X.Y.Z); Nextcloud
+	# resolves apps by bare id ('contacts'), so a versioned dir => AppPathNotFoundException once
+	# the app becomes compatible. Normalize to bare name (guarded: no-op if already bare).
+	if [ -d "/usr/local/lib/owncloud/apps/contacts-$version_contacts" ]; then
+		rm -rf /usr/local/lib/owncloud/apps/contacts
+		mv "/usr/local/lib/owncloud/apps/contacts-$version_contacts" /usr/local/lib/owncloud/apps/contacts
+	fi
 	rm /tmp/contacts.tgz
 
 	wget_verify "https://github.com/nextcloud-releases/calendar/archive/refs/tags/v$version_calendar.tar.gz" "$hash_calendar" /tmp/calendar.tgz
 	tar xf /tmp/calendar.tgz -C /usr/local/lib/owncloud/apps/
+	if [ -d "/usr/local/lib/owncloud/apps/calendar-$version_calendar" ]; then
+		rm -rf /usr/local/lib/owncloud/apps/calendar
+		mv "/usr/local/lib/owncloud/apps/calendar-$version_calendar" /usr/local/lib/owncloud/apps/calendar
+	fi
 	rm /tmp/calendar.tgz
 
 	# Starting with Nextcloud 15, the app user_external is no longer included in Nextcloud core,
