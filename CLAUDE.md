@@ -21,20 +21,29 @@ Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspam
 
 ---
 
-## Feature Branches
+## Arhitectura addon — OVERLAY pe zone (NU feature branches)
 
-Fiecare branch e independent, de pe `main`:
+> ⚠ Vechiul model „feature branches" (`feature/external-dns`, `feature/rspamd-*`, etc.) e **ABANDONAT** — edita inline upstream → conflict la fiecare upgrade. Acele branch-uri NU mai exista in origin. Modelul curent = **overlay pe zone**, traieste in `management/geseidl_edition/` + `setup/geseidl_edition/`. Sursa de adevar: [`management/geseidl_edition/OVERLAY.md`](management/geseidl_edition/OVERLAY.md).
 
-| Branch | Scop |
-|--------|------|
-| `feature/external-dns-settings` | Skip NS/DNSSEC/TLSA/glue/A record checks pt DNS extern (Cloudflare) |
-| `feature/nat-aware-checks` | Service checks pe PRIVATE_IP când behind NAT, MTA-STS fallback localhost |
-| `feature/spamhaus-forwarders-fix` | Auto zone exception pt spamhaus.org când bind9 are forwarders |
-| `feature/email-archive-option` | `archive_address` în settings.yaml → `always_bcc` în Postfix |
-| `feature/rspamd-spam-filter` | Înlocuire SpamAssassin cu rspamd |
-| `feature/whitelist-management` | API admin whitelist/blacklist (ambele filtre) |
-| `feature/rspamd-hardening` | DQS, composite rules, DMARC scoring, Lua anti-phishing |
-| `feature/webmail-subdomain` | Webmail per-domeniu: `mail.<domeniu>/mail/` (Roundcube) cu cert LE propriu, auto-provizionat ca `autoconfig.`/`autodiscover.` (necesita DNS `mail.<domeniu>` A → box) |
+**Stare verificata 2026-06-09**: `main` = `upstream/main` + **40 commits geseidl** (3 in urma upstream/main, upstream tag curent **v76**, baza fork **v75** — gap trivial, merge curat). Manifest live (`/root/mailinabox/.geseidl-edition` = repo) → `overlay_version: 0.9.0`, **toate 6 zone active**.
+
+| Zona | Continut | Tip | Versiune |
+|------|----------|-----|----------|
+| **status** | badge versiune fork; NS/glue/resolve/MX/DNSSEC/MTA-STS re-verificate pe DNS PUBLIC (1.1.1.1/8.8.8.8) + site-live HTTP + Spamhaus DQS + backup extern. NU mascheaza orb — re-verifica realitatea | runtime | v0.2.0 |
+| **dns** | resolver → `127.0.0.1` (bind9) + spamhaus exception zones, idempotent + verify/rollback | provisioning | v0.2.0 |
+| **ssl** | cert-provisioning resolve-check pe DNS public (patch idempotent) | provisioning | v0.4.0 |
+| **mail** | arhiva email (`always_bcc` din settings.yaml) + **restrictie IMAP per-cont la source IP** (Dovecot `allow_nets`, tabel sidecar `geseidl_imap_restrictions` + CLI `imap_restrict.py`) | provisioning | v0.5.0 / v0.9.0 |
+| **web** | webmail per-domeniu `mail.<domeniu>/mail/` + branding HTTP_HOST, patch-uri idempotente | provisioning | v0.6.0 |
+| **spam** | rspamd: fisiere fork-tracked (`setup/rspamd.sh` 446l + UI `system-spam.html`) + 4 patch-uri integrare (mail-postfix/spamassassin/daemon-api/index), signature-gate, dry-run+revert | provisioning + runtime | v0.8.0 |
+
+**Workflow upgrade upstream** (cand OS-ul permite setup — vezi blocaj 24.04 mai jos):
+```bash
+git fetch upstream && git merge upstream/main                    # conflicte doar pe blocuri marcate GESEIDL (mici)
+python3 management/geseidl_edition/apply_overlay.py apply         # reinsereaza hook-uri runtime (idempotent)
+sudo bash setup/geseidl_edition/apply_setup_overlay.sh           # reaplica zone provisioning (idempotent)
+sudo systemctl restart mailinabox
+```
+`apply_overlay.py {status|apply|remove|selftest}`. Marker = `# >>> GESEIDL EDITION OVERLAY >>>` / `# <<< ... <<<`. Logica reala traieste EXCLUSIV in `geseidl_edition/`, niciodata in corpul functiilor upstream.
 
 ---
 
@@ -90,6 +99,38 @@ Box-ul a fost upgradat OS 22.04→24.04 candva; serviciile MiaB ruleaza, dar **s
 ```bash
 cd /root/mailinabox && bash setup/nextcloud.sh   # ruleaza DOAR zona nextcloud, fara preflight
 ```
+
+---
+
+## Securitate — model pe 3 straturi (status 2026-06-09, verificat live)
+
+> Raspuns la „suntem in siguranta cu toate elementele?" — **partial**. Cele 3 straturi NU sunt acoperite egal:
+
+| Strat | Componente | Mecanism update | Status |
+|-------|-----------|-----------------|--------|
+| **1. OS base** | kernel, glibc, openssl, systemd, pachete apt | `unattended-upgrades` ACTIV + `daily-reboot.timer` 02:30 | ✅ **la zi** (0 security pending, verificat) |
+| **2. MiaB app-layer** | template-uri Postfix/Dovecot/nginx, fail2ban jails, rspamd ruleset, config-uri MiaB-managed | `setup/*.sh` la `sudo mailinabox` | ⚠ **INGHETAT** — setup blocat pe 24.04 (vezi sus). Config-urile NU se reaplica. **Exceptie: certuri LE se reinnoiesc** via `daily_tasks.sh` (cron 01:07, independent de setup) — cert principal expira 21-Aug-2026, auto-renew ~iulie ✅ |
+| **3. App stack (Nextcloud)** | Nextcloud + apps + PHP runtime | manual (`occ upgrade` / `nextcloud.sh` standalone) | 🔴 **STALE — risc real** |
+
+**Stratul 3 = singurul risc de securitate efectiv si actionabil acum:**
+- **Nextcloud 26.0.13** — linia 26 e **EOL din 31-mar-2024** (~2 ani fara patch-uri upstream). CVE-uri NC nepatch-uite = vector real (acces contacte/calendar CalDAV/CardDAV, potential RCE → foothold pe mail server).
+- **PHP 8.0.30** — EOL upstream 26-nov-2023; patch-uit DOAR prin `ondrej/php` PPA (dependenta de 1 maintainer tert). NC nu poate urca fara PHP nou (8.1→8.2) = bottleneck.
+
+**DECUPLARE cheie**: upgrade-ul Nextcloud e **separabil** de problema OS 24.04. Se face standalone (`bash setup/nextcloud.sh` cu versiune pinata noua + bump PHP), FARA re-run `mailinabox`. Deci stratul 3 se poate remedia pe box-ul curent, independent de decizia strategica OS.
+
+**Lant upgrade NC** (fiecare treapta = `occ upgrade`, posibil bump PHP): 26 → 27 → 28 → 29 (→ 30/31). NU se sare versiune majora. Backup `owncloud.db` + `config.php` inainte de FIECARE treapta (vezi runbook recuperare jos).
+
+### Decizie strategica OS (pending aprobare user — NU executa)
+
+Upstream MiaB = **22.04-only confirmat** (preflight v76 hard-codeaza `VERSION_ID==22.04`, niciun roadmap 24.04). Optiuni:
+
+| Opt | Descriere | Pro | Contra |
+|-----|-----------|-----|--------|
+| **A. Patch preflight → 24.04** | 1-line guard geseidl care accepta 24.04 → setup re-ruleaza → strat 2 dezghetat | ieftin, rapid, pastreaza OS curent | **snowflake** — `setup/*.sh` scrise/testate pt pachete 22.04; pe 24.04 (PHP 8.3 default, versiuni Dovecot/Postfix diferite) setup poate strica. De ce upstream guardeaza. Risc pe productie |
+| **B. Blue-green rebuild pe 22.04** | box nou 22.04 curat → fork geseidl-edition → migrare backup/restore MiaB → cutover DNS | suportat oficial, valideaza DR, overlay-ul ride-uieste upstream cum e proiectat | scump (VM nou + fereastra cutover); 22.04 standard support → apr-2027 (runway ~10 luni → posibil alt migrate curand) |
+| **C. Status-quo + mentenanta manuala** | per-componenta (ca recovery NC 2026-06-09) | zero efort acum | fragil; strat 2 ramane inghetat indefinit |
+
+**Recomandare (Gemini xhigh + verificare la sursa):** **B pe termen lung** (revine pe sine suportate), DAR **stratul 3 (NC) se ataca ACUM independent** (opt A-light doar pt `nextcloud.sh`, fara setup complet) fiindca e singurul risc activ. Decizia A/B/C = a user-ului.
 
 ---
 
