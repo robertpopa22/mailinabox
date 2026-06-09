@@ -21,6 +21,15 @@ echo "Installing Nginx (web server)..."
 
 apt_install nginx php"${PHP_VER}"-cli php"${PHP_VER}"-fpm idn2
 
+# GESEIDL SOVEREIGN FORK: nginx 1.24 mime.types lacks `.mjs`, so it's served as
+# application/octet-stream. Nextcloud 30+ ships ES modules (.mjs); Chrome's strict module
+# MIME check then refuses them and the Contacts SPA (pure .mjs) renders blank. Map .mjs to
+# application/javascript. Idempotent + re-applied here because apt --force-confnew would
+# otherwise revert mime.types on an nginx package update.
+if ! grep -qE 'application/javascript[[:space:]].*\bmjs\b' /etc/nginx/mime.types; then
+	sed -i 's#\(application/javascript[[:space:]]\+\)js;#\1js mjs;#' /etc/nginx/mime.types
+fi
+
 rm -f /etc/nginx/sites-enabled/default
 
 # Copy in a nginx configuration file for common and best-practices
