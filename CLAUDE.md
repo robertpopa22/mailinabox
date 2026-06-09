@@ -29,11 +29,11 @@ Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspam
 | **Repo** | robertpopa22/mailinabox (fork upstream mail-in-a-box/mailinabox) |
 | **Branch deploiat (live)** | `main` (commit 8564f8f la 2026-06-08) — NU `geseidl-edition`. Overlay-ul geseidl e cherry-picked pe main. |
 | **Deploy** | MAIL02 (10.0.1.89), Hyper-V VM "GES-MAIL02" pe **GES-S11** (migrat de pe S00; copia S00 = Off) |
-| **OS live** | **Ubuntu 24.04.4 LTS** — baseline-ul nostru (fork suveran). `preflight.sh` upstream blocheaza 24.04 → patch propriu de aplicat (vezi DECIZIE DE BAZĂ). |
-| **PHP** | 8.0 acum (= upstream); **de urcat la 8.2/8.3** sub modelul suveran, pt NC suportat |
+| **OS live** | **Ubuntu 24.04.4 LTS** — baseline-ul nostru (fork suveran). `preflight.sh` patch-uit sa accepte 24.04 (DONE 2026-06-09). |
+| **PHP** | **8.2** (upgrade 2026-06-09 de pe 8.0 EOL). `PHP_VER` in `functions.sh` override-abil din env. `php8.0-fpm` dezactivat. |
 | **SSH** | `ssh -i ~/.ssh/ges-mail01 dit2022@10.0.1.89` (prin `NET-ADMIN/tools/secure_connect.py --target ges-mail02 --sudo`) |
 | **Resurse** | 44 vCPU, ~47 GB RAM (verificat 2026-06-09) |
-| **Nextcloud** | 26.0.13 (contacts 5.5.4, calendar 4.7.20, user_external 3.4.0); DB SQLite `/home/user-data/owncloud/owncloud.db` |
+| **Nextcloud** | **33.0.5** (contacts 8.5.1, calendar 6.4.2, user_external 4.0.0) — upgrade 26→33 la 2026-06-09; DB SQLite `/home/user-data/owncloud/owncloud.db`. Apps din **release-asset** (nu `/archive/`). |
 
 ---
 
@@ -122,29 +122,22 @@ cd /root/mailinabox && bash setup/nextcloud.sh   # ruleaza DOAR zona nextcloud, 
 | Strat | Componente | Mecanism update | Status |
 |-------|-----------|-----------------|--------|
 | **1. OS base** | kernel, glibc, openssl, systemd, pachete apt | `unattended-upgrades` ACTIV + `daily-reboot.timer` 02:30 | ✅ **la zi** (0 security pending, verificat) |
-| **2. MiaB app-layer** | template-uri Postfix/Dovecot/nginx, fail2ban jails, rspamd ruleset, config-uri MiaB-managed | `setup/*.sh` la `sudo mailinabox` | ⚠ **INGHETAT** — setup blocat pe 24.04 (vezi sus). Config-urile NU se reaplica. **Exceptie: certuri LE se reinnoiesc** via `daily_tasks.sh` (cron 01:07, independent de setup) — cert principal expira 21-Aug-2026, auto-renew ~iulie ✅ |
-| **3. App stack (Nextcloud)** | Nextcloud + apps + PHP runtime | manual (`occ upgrade` / `nextcloud.sh` standalone) | 🔴 **STALE — risc real** |
+| **2. MiaB app-layer** | template-uri Postfix/Dovecot/nginx, fail2ban jails, rspamd ruleset, config-uri MiaB-managed | `setup/*.sh` la `sudo mailinabox` | ✅ **DEZGHETAT** — `preflight` accepta 24.04; `mailinabox`/`start.sh` ruleaza din nou pe baseline-ul nostru (re-run complet 2026-06-09). Certuri LE auto-renew via `daily_tasks.sh`. |
+| **3. App stack (Nextcloud)** | Nextcloud + apps + PHP runtime | `nextcloud.sh` (lant 26→33) / `occ upgrade` | ✅ **LA ZI** — NC 33.0.5 + PHP 8.2 (2026-06-09) |
 
-**Stratul 3 = singurul risc de securitate efectiv si actionabil acum:**
-- **Nextcloud 26.0.13** — linia 26 e **EOL din 31-mar-2024** (~2 ani fara patch-uri upstream). CVE-uri NC nepatch-uite = vector real (acces contacte/calendar CalDAV/CardDAV, potential RCE → foothold pe mail server).
-- **PHP 8.0.30** — EOL upstream 26-nov-2023; patch-uit DOAR prin `ondrej/php` PPA (dependenta de 1 maintainer tert). NC nu poate urca fara PHP nou (8.1→8.2) = bottleneck.
+**Stratul 3 — REZOLVAT 2026-06-09** (era singurul risc activ):
+- **Nextcloud 26.0.13 → 33.0.5** — linia 26 era EOL mar-2024, expusa public pe `/cloud`. Acum pe linie suportata (33, suport pana ~2027). Upgrade prin lant secvential 26→27→…→33 (`setup/nextcloud.sh`).
+- **PHP 8.0 → 8.2** — 8.0 era EOL nov-2023. `php8.0-fpm` dezactivat. (8.2 e deprecated in NC 33 dar suportat; bump la 8.3 = follow-up nepresant, 8.2 EOL dec-2026.)
 
-**DECUPLARE cheie**: upgrade-ul Nextcloud e **separabil** de problema OS 24.04. Se face standalone (`bash setup/nextcloud.sh` cu versiune pinata noua + bump PHP), FARA re-run `mailinabox`. Deci stratul 3 se poate remedia pe box-ul curent, independent de decizia strategica OS.
+### Decizie strategica OS + NC — REZOLVAT + EXECUTAT prin FORK SUVERAN (2026-06-09)
 
-**Lant upgrade NC** (fiecare treapta = `occ upgrade`, posibil bump PHP): 26 → 27 → 28 → 29 (→ 30/31). NU se sare versiune majora. Backup `owncloud.db` + `config.php` inainte de FIECARE treapta (vezi runbook recuperare jos).
+> Vezi "⭐ DECIZIE DE BAZĂ" (sus). Constrangerea upstream (22.04 / NC 26 / PHP 8.0) **nu ne mai leaga** — am ridicat-o.
 
-### Decizie strategica OS + NC — REZOLVAT prin FORK SUVERAN (2026-06-09)
+Context verificat la sursa: upstream MiaB v76 = ÎNCĂ 22.04-only + NC 26 + PHP 8.0. Forkul nostru era identic; acum suntem suverani si l-am depasit.
 
-> Vezi "⭐ DECIZIE DE BAZĂ" (sus). Constrangerea upstream (22.04 / NC 26 / PHP 8.0) **nu ne mai leaga** — o ridicam noi.
+**Executat (commit-uri `d54d068..fd6a9c7`):** preflight 24.04; PHP 8.0→8.2; lant `nextcloud.sh` 26→33 (SHA1 pinned, apps din release-asset); fix-uri 24.04/systemd255 (pip `--break-system-packages`, scos `systemctl link`, rspamd training non-fatal+run-once, nginx upstream php8.2). **PHP 8.2 acopera tot lantul 26→33** (single-stage). Detalii + catalog fix-uri reutilizabil: memoria `project_mailinabox_sovereign_fork` + `NET-ADMIN/GESEIDL/GES-MAIL01/GES-MAIL02.log.md` (2026-06-09 12:15).
 
-Context verificat la sursa: upstream MiaB v76 = ÎNCĂ 22.04-only (preflight hard `VERSION_ID==22.04`) + ÎNCĂ NC 26.0.13 + PHP 8.0. Forkul nostru era identic. NC 26 EOL (mar-2024) e un **plafon upstream**, nu un bug al nostru — dar acum suntem suverani si il depasim singuri.
-
-**Plan sub model suveran (execuție sesiune nouă, checkpoint obligatoriu, blue-green pe componente riscante):**
-1. **Stratul 2 (app-layer dezghetat):** patch `setup/preflight.sh` → accepta 24.04 → `mailinabox`/setup ruleaza din nou pe baseline-ul nostru. Atentie: `setup/*.sh` testate de upstream pe 22.04 → testare pe clona inainte de productie.
-2. **Stratul 3 (NC la zi):** bump `setup/nextcloud.sh` (`nextcloud_ver` → versiune suportata 32/33; `PHP_VER` → 8.2/8.3). NC cere upgrade major secvential (26→27→…→32) SAU instalare curata NC nou + migrare date — decizie de implementare la executie.
-3. **Compensator interimar** (pana la upgrade NC): NC `/cloud` + DAV sunt PUBLICE (status.php 200 de pe IP public) → restrange UI web NC la LAN/VPN ca sa tai suprafata CVE EOL (atentie sync DAV mobil — decizie operationala).
-
-Riscul activ acum = NC 26 EOL expus public (vezi compensator). Restul (OS/app-layer) = stabil, fara presiune imediata.
+**Follow-up nepresant:** purge pachete `php8.0*` (21, dezactivate); evaluare bump PHP 8.2→8.3; decuplare NC intr-un VM standalone (durabil — NC nu mai depinde de pin-ul MiaB).
 
 ---
 
