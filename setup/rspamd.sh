@@ -399,7 +399,7 @@ model_parameters {
 
 timeout = 15;
 reason_header = "X-GPT-Reason";
-autolearn = false;
+autolearn = true;
 
 symbols_to_except {
   BAYES_SPAM = 0.9;
@@ -427,14 +427,18 @@ gpt_skip_authenticated {
 EOF
 	fi
 
-	# Default production weights; live box may override (e.g. 0.0 during dry-run).
+	# Production weights (active 2026-06-11): GPT_SPAM 7.0 = solo Junk at prob 1.0;
+	# categorical symbols stack; reject only together with classic signals (threshold 15).
 	if ! grep -q '"GPT"' /etc/rspamd/local.d/groups.conf 2>/dev/null; then
 		cat >> /etc/rspamd/local.d/groups.conf << 'EOF'
 
 group "GPT" {
   symbols = {
-    "GPT_SPAM" { weight = 4.0; }
-    "GPT_HAM" { weight = -2.0; }
+    "GPT_SPAM" { weight = 7.0; }
+    "GPT_HAM" { weight = -3.0; }
+    "GPT_PHISHING" { weight = 4.0; }
+    "GPT_SCAM" { weight = 4.0; }
+    "GPT_MALWARE" { weight = 4.0; }
   }
 }
 EOF
