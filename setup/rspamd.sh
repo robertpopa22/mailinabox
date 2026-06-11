@@ -375,22 +375,25 @@ EOF
 # Postfilter: runs ONLY on uncertain verdicts (skips decided spam/ham, whitelists,
 # FUZZY_DENIED, replies, bounces and client domains via CLIENT_DOMAIN_FROM).
 # Enabled only when settings.yaml contains `gpt_api_key:` (key never in repo).
-# Provider chosen by benchmark 2026-06-11: Anthropic Claude Haiku 4.5 via the
-# OpenAI-compatible endpoint (95% accuracy, ~1.3s latency). Details:
-# NET-ADMIN/GESEIDL/GES-MAIL01/llm-spam-bench-2026-06.summary.csv
+# Provider chosen by extended benchmark 2026-06-11 (12 models): OpenAI
+# gpt-5.4-mini — 97.5% accuracy, 21/21 spam caught (only perfect recall), 1.6s.
+# Manual fallback (Gemini 3.1 Flash-Lite, 97.5%/0 FP) lives commented in the
+# live box's gpt.conf — the gpt module has no native cross-provider fallback
+# and fails open on API errors (mail keeps flowing on classic filters). Details:
+# NET-ADMIN/GESEIDL/GES-MAIL01/llm-spam-bench-2026-06*.summary.csv
 GPT_API_KEY=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^gpt_api_key:" | awk '{print $2}')
 if [ -n "$GPT_API_KEY" ]; then
 	cat > /etc/rspamd/local.d/gpt.conf << EOF
 enabled = true;
 type = "openai";
-url = "https://api.anthropic.com/v1/chat/completions";
-model = "claude-haiku-4-5";
+url = "https://api.openai.com/v1/chat/completions";
+model = "gpt-5.4-mini";
 api_key = "$GPT_API_KEY";
 
 model_parameters {
-  "claude-haiku-4-5" {
-    max_tokens = 1000;
-    temperature = 0.0;
+  "gpt-5.4-mini" {
+    max_completion_tokens = 1000;
+    reasoning_effort = "none";
   }
 }
 
