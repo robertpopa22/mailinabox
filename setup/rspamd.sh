@@ -15,6 +15,16 @@ echo "Installing rspamd spam filter..."
 
 # === INSTALL PACKAGES ===
 
+# Official rspamd.com apt repo: Ubuntu noble ships rspamd 3.8.x, but the gpt
+# module (secondary LLM spam filter) needs rspamd >= 3.9. Production (MAIL02)
+# runs 4.1.0 from this repo since 2026-06-11.
+mkdir -p /etc/apt/keyrings
+if [ ! -f /etc/apt/keyrings/rspamd.gpg ]; then
+	wget -qO- https://rspamd.com/apt-stable/gpg.key | gpg --dearmor > /etc/apt/keyrings/rspamd.gpg
+fi
+echo "deb [signed-by=/etc/apt/keyrings/rspamd.gpg] http://rspamd.com/apt-stable/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/rspamd.list
+hide_output apt-get update
+
 apt_install rspamd redis-server
 
 # === WORKER CONFIGURATION ===
@@ -289,7 +299,20 @@ RO_PHISH_SUBJECT {
     score = 4.0;
     description = "Subject matches known RO phishing wave";
 }
+
+CLIENT_DOMAIN_FROM {
+    type = "from";
+    filter = "email:domain";
+    map = "/etc/rspamd/local.d/client_domains.map";
+    score = 0.0;
+    description = "Sender domain = client/partner (bidirectional correspondence) - excluded from LLM filter";
+}
 EOF
+
+# Client/partner domains map: production fill from the email index
+# (NET-ADMIN/GESEIDL/GES-MAIL01/tools/update_client_domains.py keeps it updated
+# daily, additive-only). Never overwrite an existing map here.
+[ -f /etc/rspamd/local.d/client_domains.map ] || touch /etc/rspamd/local.d/client_domains.map
 
 # Composites for brand impersonation + foreign-origin RO phishing
 cat > /etc/rspamd/local.d/composites.conf << 'CEOF'
@@ -335,6 +358,85 @@ CEOF
 cat > /etc/rspamd/local.d/redis.conf << 'EOF'
 servers = "127.0.0.1";
 EOF
+
+# DMARC module: rspamd 4.x requires the reporting{} block syntax
+# (the 3.x `reporting = false;` boolean breaks plugin init on 4.x).
+cat > /etc/rspamd/local.d/dmarc.conf << 'EOF'
+reporting {
+  enabled = false;
+}
+actions = {
+  quarantine = "add_header";
+  reject = "reject";
+}
+EOF
+
+# === GPT MODULE (secondary LLM spam filter, rspamd >= 3.9) ===
+# Postfilter: runs ONLY on uncertain verdicts (skips decided spam/ham, whitelists,
+# FUZZY_DENIED, replies, bounces and client domains via CLIENT_DOMAIN_FROM).
+# Enabled only when settings.yaml contains `gpt_api_key:` (key never in repo).
+# Provider chosen by benchmark 2026-06-11: Anthropic Claude Haiku 4.5 via the
+# OpenAI-compatible endpoint (95% accuracy, ~1.3s latency). Details:
+# NET-ADMIN/GESEIDL/GES-MAIL01/llm-spam-bench-2026-06.summary.csv
+GPT_API_KEY=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^gpt_api_key:" | awk '{print $2}')
+if [ -n "$GPT_API_KEY" ]; then
+	cat > /etc/rspamd/local.d/gpt.conf << EOF
+enabled = true;
+type = "openai";
+url = "https://api.anthropic.com/v1/chat/completions";
+model = "claude-haiku-4-5";
+api_key = "$GPT_API_KEY";
+
+model_parameters {
+  "claude-haiku-4-5" {
+    max_tokens = 1000;
+    temperature = 0.0;
+  }
+}
+
+timeout = 15;
+reason_header = "X-GPT-Reason";
+autolearn = false;
+
+symbols_to_except {
+  BAYES_SPAM = 0.9;
+  WHITELIST_SPF = -1;
+  WHITELIST_DKIM = -1;
+  WHITELIST_DMARC = -1;
+  FUZZY_DENIED = -1;
+  REPLY = -1;
+  BOUNCE = -1;
+  CLIENT_DOMAIN_FROM = -1;
+}
+EOF
+	chown root:_rspamd /etc/rspamd/local.d/gpt.conf
+	chmod 640 /etc/rspamd/local.d/gpt.conf
+
+	# Authenticated (own outbound) mail never goes through the LLM.
+	if ! grep -q gpt_skip_authenticated /etc/rspamd/local.d/settings.conf 2>/dev/null; then
+		cat >> /etc/rspamd/local.d/settings.conf << 'EOF'
+gpt_skip_authenticated {
+  authenticated = true;
+  apply {
+    symbols_disabled = ["GPT_CHECK"];
+  }
+}
+EOF
+	fi
+
+	# Default production weights; live box may override (e.g. 0.0 during dry-run).
+	if ! grep -q '"GPT"' /etc/rspamd/local.d/groups.conf 2>/dev/null; then
+		cat >> /etc/rspamd/local.d/groups.conf << 'EOF'
+
+group "GPT" {
+  symbols = {
+    "GPT_SPAM" { weight = 4.0; }
+    "GPT_HAM" { weight = -2.0; }
+  }
+}
+EOF
+	fi
+fi
 
 # === DOVECOT IMAPSIEVE ===
 
