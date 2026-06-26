@@ -1,13 +1,14 @@
 #!/bin/bash
-# Nightly PostgreSQL dump of the `emails` database (custom format) +
+# Nightly PostgreSQL dump of the `ges_mail` database (custom format) +
 # retention prune (delete dumps older than RETENTION_DAYS).
+# (DB renamed emails -> ges_mail 2026-06-19; unit name pg-backup-emails kept.)
 #
 # Run as user `postgres` via systemd timer (pg-backup-emails.timer).
-# Output: /home/user-data/pg-backup/emails-YYYY-MM-DD.dump
+# Output: /home/user-data/pg-backup/ges_mail-YYYY-MM-DD.dump
 set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/home/user-data/pg-backup}"
-DB_NAME="${DB_NAME:-emails}"
+DB_NAME="${DB_NAME:-ges_mail}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 
 mkdir -p "$BACKUP_DIR"

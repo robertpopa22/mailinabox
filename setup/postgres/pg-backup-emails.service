@@ -1,5 +1,5 @@
 [Unit]
-Description=Nightly pg_dump of the emails database
+Description=Nightly pg_dump of the ges_mail database
 After=postgresql.service
 Wants=postgresql.service
 
@@ -12,7 +12,7 @@ IOSchedulingClass=idle
 # Path is hard-coded to /opt/pg-backup (installed by setup/postgres/install.sh)
 ExecStart=/usr/bin/flock -w 300 /var/lock/pg-backup-emails.lock /usr/local/bin/pg-backup-emails.sh
 Environment=BACKUP_DIR=/home/user-data/pg-backup
-Environment=DB_NAME=emails
+Environment=DB_NAME=ges_mail
 Environment=RETENTION_DAYS=30
 StandardOutput=journal
 StandardError=journal

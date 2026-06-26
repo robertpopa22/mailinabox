@@ -30,12 +30,12 @@ done
 
 # ---------------------------------------------------------------------------
 echo "=== 2. PostgreSQL connectivity ==="
-if PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -c "SELECT 1" >/dev/null 2>&1; then
+if PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U ges_mail_reader ges_mail -c "SELECT 1" >/dev/null 2>&1; then
     ok "PG reader connect"
 else
     err "PG reader connect"
 fi
-if PGPASSWORD="$EMAIL_INDEXER_PW" psql -h 10.0.1.89 -U email_indexer emails -c "SELECT 1" >/dev/null 2>&1; then
+if PGPASSWORD="$EMAIL_INDEXER_PW" psql -h 10.0.1.89 -U ges_mail_indexer ges_mail -c "SELECT 1" >/dev/null 2>&1; then
     ok "PG indexer connect"
 else
     err "PG indexer connect"
@@ -43,7 +43,7 @@ fi
 
 # ---------------------------------------------------------------------------
 echo "=== 3. Schema sanity ==="
-SCHEMA_CHECK=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -tAc "
+SCHEMA_CHECK=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U ges_mail_reader ges_mail -tAc "
     SELECT
         (SELECT count(*) FROM pg_extension WHERE extname='unaccent') AS ext_unaccent,
         (SELECT count(*) FROM pg_extension WHERE extname='pg_trgm') AS ext_trgm,
@@ -55,7 +55,7 @@ if [[ "$SCHEMA_CHECK" == "1|1|1|1" ]]; then ok "schema complete"; else err "sche
 
 # ---------------------------------------------------------------------------
 echo "=== 4. Row counts ==="
-ROWS=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -tAc "SELECT source, count(*) FROM emails GROUP BY source ORDER BY source")
+ROWS=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U ges_mail_reader ges_mail -tAc "SELECT source, count(*) FROM emails GROUP BY source ORDER BY source")
 echo "$ROWS" | while read -r line; do echo "  $line"; done
 LIVE=$(echo "$ROWS" | grep '^live|' | cut -d'|' -f2)
 ARCHIVE=$(echo "$ROWS" | grep '^archive|' | cut -d'|' -f2)
@@ -64,7 +64,7 @@ ARCHIVE=$(echo "$ROWS" | grep '^archive|' | cut -d'|' -f2)
 
 # ---------------------------------------------------------------------------
 echo "=== 5. FTS query basic ==="
-if PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -tAc "
+if PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U ges_mail_reader ges_mail -tAc "
     SELECT count(*) FROM emails WHERE body_tsv @@ websearch_to_tsquery('simple', public.immutable_unaccent('factura'))
 " 2>&1 | grep -q '^[0-9]\+$'; then
     ok "FTS 'factura' returns numeric count"
@@ -75,7 +75,7 @@ fi
 # ---------------------------------------------------------------------------
 echo "=== 6. Message-ID exact match (Grigoras forwarded email) ==="
 MID='06139703-d4c7-4ff9-815f-94515f91ce7c@geseidl.ro'
-COUNT=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -tAc "
+COUNT=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U ges_mail_reader ges_mail -tAc "
     SELECT count(*) FROM emails WHERE message_id LIKE '%$MID%'
 " 2>&1)
 echo "  Message-ID hits: $COUNT"
@@ -83,7 +83,7 @@ echo "  Message-ID hits: $COUNT"
 
 # ---------------------------------------------------------------------------
 echo "=== 7. Romanian diacritics search ==="
-DIAC=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -tAc "
+DIAC=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U ges_mail_reader ges_mail -tAc "
     SELECT count(*) FROM emails
     WHERE body_tsv @@ websearch_to_tsquery('simple', public.immutable_unaccent('salariu'))
 " 2>&1)
@@ -91,7 +91,7 @@ DIAC=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -t
 
 # ---------------------------------------------------------------------------
 echo "=== 8. Folder breakdown ==="
-FOLDERS=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U email_reader emails -tAc "
+FOLDERS=$(PGPASSWORD="$EMAIL_READER_PW" psql -h 10.0.1.89 -U ges_mail_reader ges_mail -tAc "
     SELECT count(DISTINCT folder) FROM emails
 " 2>&1)
 [[ ${FOLDERS:-0} -gt 100 ]] && ok "$FOLDERS unique folders" || err "only $FOLDERS folders"
