@@ -163,14 +163,19 @@ WHITELIST_FILE="/etc/rspamd/local.d/whitelist-domains.map"
 BLACKLIST_FILE="/etc/rspamd/local.d/blacklist-domains.map"
 touch "$WHITELIST_FILE" "$BLACKLIST_FILE"
 
+# Geseidl baseline whitelist seed — domenii client/infra care TREBUIE sa
+# supravietuiasca regenerarii hartii din settings.yaml. Incident 2026-06-23:
+# `sudo mailinabox` (full setup) a regenerat harta din settings.yaml fara cheia
+# spam_whitelist -> utcb.ro pierdut. Seed-ul se uneste (dedup) cu lista din admin UI.
 $MIAB_PYTHON << PYEOF
 import sys, os
 sys.path.insert(0, os.path.join('$PWD', 'management'))
 from utils import load_settings, load_environment
 env = load_environment()
 settings = load_settings(env)
-wl = settings.get('spam_whitelist', [])
-bl = settings.get('spam_blacklist', [])
+GESEIDL_WL_SEED = ['utcb.ro', 'seo.geseidl@gmail.com']
+wl = list(dict.fromkeys((settings.get('spam_whitelist', []) or []) + GESEIDL_WL_SEED))
+bl = settings.get('spam_blacklist', []) or []
 with open('$WHITELIST_FILE', 'w') as f:
     f.write('\n'.join(wl) + '\n' if wl else '')
 with open('$BLACKLIST_FILE', 'w') as f:
