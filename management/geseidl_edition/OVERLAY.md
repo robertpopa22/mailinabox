@@ -91,7 +91,7 @@ Principiu cheie: **NU mascăm orbește**. Re-verificăm fiecare eroare față de
 
 Cauze rădăcină ale false-pozitivelor pe acest box:
 1. **DNS extern** — domeniile sunt pe Cloudflare; MiaB se așteaptă să fie EL nameserverul.
-2. **NAT + resolver split-horizon** — box `82.79.229.146` public / `10.0.1.89` privat; resolverul
+2. **NAT + resolver split-horizon** — box `81.196.135.66` public / `10.0.1.89` privat; resolverul
    intern (AD) întoarce IP-uri interne. Publicul e corect.
 
 | Check upstream | Re-verificare overlay | Rezultat |

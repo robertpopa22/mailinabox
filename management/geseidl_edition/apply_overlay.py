@@ -271,10 +271,10 @@ def cmd_selftest():
 		head("geseidl.ro"),
 		warn("Mail-in-a-Box is configured to use a public DNS server. This is not supported by spamhaus. Could not determine whether the domain geseidl.ro is blacklisted."),
 		err("The nameservers set on this domain are incorrect. They are currently tim.ns.cloudflare.com; tina.ns.cloudflare.com."),
-		err("This domain should resolve to this box's IP address (A 82.79.229.146) ... currently resolves to 104.26.3.65."),
+		err("This domain should resolve to this box's IP address (A 81.196.135.66) ... currently resolves to 104.26.3.65."),
 		err("MTA-STS policy is missing: STSFetchResult.NONE"),
 	]
-	env = {"PRIMARY_HOSTNAME": "mail.geseidl.ro", "PUBLIC_IP": "82.79.229.146"}
+	env = {"PRIMARY_HOSTNAME": "mail.geseidl.ro", "PUBLIC_IP": "81.196.135.66"}
 	out = FakeWeb(list(items))
 	engine.apply_overlay(out, env)
 	print("=== DUPA OVERLAY ===")
