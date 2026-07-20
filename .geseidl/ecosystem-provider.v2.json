@@ -1,0 +1,67 @@
+{
+  "contract": "geseidl.ecosystem-provider",
+  "schema_version": 2,
+  "id": "mail-in-a-box",
+  "source_repo": "mailinabox",
+  "title": "Mail & colaborare",
+  "description": "Serviciile GESEIDL de e-mail, webmail, calendar, contacte și colaborare, construite pe forkul Mail-in-a-Box administrat și securizat de echipa tehnică.",
+  "category": "Infrastructură",
+  "kind": "Platformă de comunicare și colaborare",
+  "stage": "PRODUCTION",
+  "progress_note": "Aplicațiile pentru colegi sunt disponibile; diagnosticul, configurarea și mentenanța serverului rămân în consola tehnică specializată.",
+  "last_verified": "2026-07-20",
+  "href": "https://mail.geseidl.ro/mail/",
+  "catalog_mode": "LINK_ONLY",
+  "evidence": {
+    "documented": true,
+    "tested": true,
+    "monitored": true
+  },
+  "navigation": {
+    "group": "infrastructure",
+    "group_label": "Infrastructură",
+    "group_order": 30,
+    "item_label": "Mail & colaborare",
+    "item_order": 20,
+    "icon": "Mail",
+    "route": "/workspace/mail-in-a-box"
+  },
+  "surfaces": [
+    {
+      "id": "collaboration-overview",
+      "title": "Serviciile de comunicare",
+      "description": "Explică aplicațiile disponibile colegilor și separă clar utilizarea zilnică de administrarea privilegiată a platformei de mail.",
+      "kind": "OVERVIEW",
+      "status": "AVAILABLE",
+      "route": "/workspace/mail-in-a-box",
+      "href": null,
+      "access_resource": "mail-in-a-box",
+      "ai_assist_ready": false,
+      "execution_mode": "NONE"
+    },
+    {
+      "id": "webmail",
+      "title": "Webmail GESEIDL",
+      "description": "Deschide aplicația de e-mail pentru utilizatorul autentificat; portalul nu primește parola și nu intermediază sesiunea de mail.",
+      "kind": "EXTERNAL_APP",
+      "status": "AVAILABLE",
+      "route": null,
+      "href": "https://mail.geseidl.ro/mail/",
+      "access_resource": "mail-in-a-box",
+      "ai_assist_ready": false,
+      "execution_mode": "NONE"
+    },
+    {
+      "id": "mail-admin",
+      "title": "Administrarea platformei Mail",
+      "description": "Configurația, diagnosticul și operațiunile de server rămân în instrumentele Mail-in-a-Box și NET-ADMIN, cu acces tehnic separat.",
+      "kind": "EXTERNAL_APP",
+      "status": "SPECIALIZED",
+      "route": null,
+      "href": null,
+      "access_resource": "net-admin",
+      "ai_assist_ready": false,
+      "execution_mode": "SPECIALIZED_CONSOLE"
+    }
+  ]
+}
