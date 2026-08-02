@@ -2,6 +2,10 @@
 
 > **Parent:** [../CLAUDE.md](../CLAUDE.md) (Gestime Ecosystem — reguli universale)
 
+## Integrare operațională GESEIDL
+
+Pentru orice sistem, date, email, document, share, identitate sau infrastructură GESEIDL, folosește mai întâi MCP-urile Geseidl namespacate. Dacă MCP-ul necesar lipsește ori eșuează, anunță înainte în commentary operația blocată, eroarea exactă, fallback-ul propus și riscul; apoi oprește-te până la acordul explicit al utilizatorului. Ierarhia unică pentru email este: MCP Geseidl, apoi IMAP direct numai prin `secure_connect.py`, apoi Thunderbird local; etapele 2/3 cer acord explicit după eroarea MCP. Outlook, COM, MAPI, Graph și fallback-urile locale tăcute sunt interzise.
+
 ---
 
 ## ⭐ DECIZIE DE BAZĂ — FORK SUVERAN (2026-06-09)
