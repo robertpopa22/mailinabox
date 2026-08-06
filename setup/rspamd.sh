@@ -307,23 +307,13 @@ RO_PHISH_SUBJECT {
 
 EOF
 
-# Client/partner domains map: production fill from the email index. The map is
-# consumed only by the auth-gated whitelist rule below; it never trusts a raw
-# From header. Never overwrite an existing map here.
-[ -f /etc/rspamd/local.d/client_domains.map ] || touch /etc/rspamd/local.d/client_domains.map
-
-# A client domain seen in bidirectional correspondence is a candidate, not a
-# trust root. Apply a modest ham bonus only after aligned DMARC succeeds. This
-# configuration is generated here so it survives every `sudo mailinabox` run.
+# Keep the local whitelist module free from traffic-derived correspondence.
+# Historic traffic, domain authentication, and volume cannot prove that an
+# incoming message is wanted business correspondence. Candidate reports and
+# approved per-sender/per-recipient relationships are maintained outside this
+# generator; neither may move mail or bypass Rspamd/GPT automatically.
 cat > /etc/rspamd/local.d/whitelist.conf << 'EOF'
-rules {
-  CLIENT_DOMAIN_AUTH = {
-    valid_dmarc = true;
-    domains = "/etc/rspamd/local.d/client_domains.map";
-    score = -2.0;
-    description = "Authenticated client/partner domain (generated from bidirectional correspondence)";
-  }
-}
+# No traffic-derived client whitelist rules.
 EOF
 
 # Composites for brand impersonation + foreign-origin RO phishing
@@ -385,7 +375,7 @@ EOF
 
 # === GPT MODULE (secondary LLM spam filter, rspamd >= 3.9) ===
 # Postfilter: runs ONLY on uncertain verdicts (skips decided spam/ham, whitelists,
-# FUZZY_DENIED, replies, bounces and DMARC-authenticated client domains).
+# FUZZY_DENIED, replies and bounces). Authentication alone never suppresses GPT.
 # Enabled only when settings.yaml contains `gpt_api_key:` (key never in repo).
 # Provider chosen by extended benchmark 2026-06-11 (12 models): OpenAI
 # gpt-5.4-mini — 97.5% accuracy, 21/21 spam caught (only perfect recall), 1.6s.
@@ -421,7 +411,6 @@ symbols_to_except {
   FUZZY_DENIED = -1;
   REPLY = -1;
   BOUNCE = -1;
-  CLIENT_DOMAIN_AUTH = -1;
 }
 EOF
 	chown root:_rspamd /etc/rspamd/local.d/gpt.conf
