@@ -305,19 +305,26 @@ RO_PHISH_SUBJECT {
     description = "Subject matches known RO phishing wave";
 }
 
-CLIENT_DOMAIN_FROM {
-    type = "from";
-    filter = "email:domain";
-    map = "/etc/rspamd/local.d/client_domains.map";
-    score = 0.0;
-    description = "Sender domain = client/partner (bidirectional correspondence) - excluded from LLM filter";
-}
 EOF
 
-# Client/partner domains map: production fill from the email index
-# (NET-ADMIN/GESEIDL/GES-MAIL01/tools/update_client_domains.py keeps it updated
-# daily, additive-only). Never overwrite an existing map here.
+# Client/partner domains map: production fill from the email index. The map is
+# consumed only by the auth-gated whitelist rule below; it never trusts a raw
+# From header. Never overwrite an existing map here.
 [ -f /etc/rspamd/local.d/client_domains.map ] || touch /etc/rspamd/local.d/client_domains.map
+
+# A client domain seen in bidirectional correspondence is a candidate, not a
+# trust root. Apply a modest ham bonus only after aligned DMARC succeeds. This
+# configuration is generated here so it survives every `sudo mailinabox` run.
+cat > /etc/rspamd/local.d/whitelist.conf << 'EOF'
+rules {
+  CLIENT_DOMAIN_AUTH = {
+    valid_dmarc = true;
+    domains = "/etc/rspamd/local.d/client_domains.map";
+    score = -2.0;
+    description = "Authenticated client/partner domain (generated from bidirectional correspondence)";
+  }
+}
+EOF
 
 # Composites for brand impersonation + foreign-origin RO phishing
 cat > /etc/rspamd/local.d/composites.conf << 'CEOF'
@@ -378,7 +385,7 @@ EOF
 
 # === GPT MODULE (secondary LLM spam filter, rspamd >= 3.9) ===
 # Postfilter: runs ONLY on uncertain verdicts (skips decided spam/ham, whitelists,
-# FUZZY_DENIED, replies, bounces and client domains via CLIENT_DOMAIN_FROM).
+# FUZZY_DENIED, replies, bounces and DMARC-authenticated client domains).
 # Enabled only when settings.yaml contains `gpt_api_key:` (key never in repo).
 # Provider chosen by extended benchmark 2026-06-11 (12 models): OpenAI
 # gpt-5.4-mini — 97.5% accuracy, 21/21 spam caught (only perfect recall), 1.6s.
@@ -414,7 +421,7 @@ symbols_to_except {
   FUZZY_DENIED = -1;
   REPLY = -1;
   BOUNCE = -1;
-  CLIENT_DOMAIN_FROM = -1;
+  CLIENT_DOMAIN_AUTH = -1;
 }
 EOF
 	chown root:_rspamd /etc/rspamd/local.d/gpt.conf
