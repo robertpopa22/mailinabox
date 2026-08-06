@@ -264,7 +264,7 @@ def cmd_selftest():
 
 	items = [
 		head("System"),
-		err("A new version of Mail-in-a-Box is available. You are running version geseidl-v75-2204to2404-validated. The latest version is v75."),
+		err("A new version of Mail-in-a-Box is available. You are running version geseidl-v76-20260806. The latest version is v76."),
 		warn("Backups are disabled. It is recommended to enable a backup for your box."),
 		head("Network"),
 		warn("Mail-in-a-Box is configured to use a public DNS server. This is not supported by spamhaus. Could not determine whether this box's IPv4 address is blacklisted."),
