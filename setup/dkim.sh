@@ -103,14 +103,21 @@ tools/editconf.py /etc/opendkim.conf -s \
 # headers. The order possibly/probably matters: OpenDMARC relies on the
 # OpenDKIM Authentication-Results header already being present.
 #
-# Be careful. If we add other milters later, this needs to be concatenated
-# on the smtpd_milters line.
+# Keep Rspamd first when it is the selected spam filter. setup/mail-postfix.sh
+# configures it earlier, but this script runs later and must not erase it.
 #
 # The OpenDMARC milter is skipped in the SMTP submission listener by
 # configuring smtpd_milters there to only list the OpenDKIM milter
 # (see mail-postfix.sh).
+SPAM_FILTER=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^spam_filter:" | awk '{print $2}')
+if [ "$SPAM_FILTER" = "rspamd" ]; then
+	POSTFIX_MILTERS="inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893"
+else
+	POSTFIX_MILTERS="inet:127.0.0.1:8891 inet:127.0.0.1:8893"
+fi
+
 tools/editconf.py /etc/postfix/main.cf \
-	"smtpd_milters=inet:127.0.0.1:8891 inet:127.0.0.1:8893"\
+	"smtpd_milters=$POSTFIX_MILTERS" \
 	non_smtpd_milters=\$smtpd_milters \
 	milter_default_action=accept
 
