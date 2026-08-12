@@ -6,6 +6,8 @@
 
 Pentru orice sistem, date, email, document, share, identitate sau infrastructură GESEIDL, folosește mai întâi MCP-urile Geseidl namespacate și verifică health/canarul înainte să declari o capabilitate indisponibilă. La indisponibilitate tehnică confirmată ori capabilitate autorizată absentă, anunță în commentary operația, eroarea/canarul și fallbackul activat, apoi continuă automat numai în scopul deja cerut. Nu există fallback pentru refuz de politică/`FORBIDDEN`, DLP/validare, autentificare/autorizare, destinatar invalid ori rezultat ambiguu și nu se face retry automat după send incert. Email: MCP → broker IMAP draft-only prin `D:\github\NET-ADMIN\tools\secure_connect.py --mail-draft-request <JSON>`; Thunderbird este exclus din fluxul automat și rămâne doar ultimă opțiune manuală pentru draft, la cererea explicită a userului. Brokerul nu exportă parole, nu citește Thunderbird, nu are SMTP/send și este idempotent. Emailurile pentru oameni sunt HTML modern profesional, randat canonic din Markdown ca multipart HTML + text accesibil, cu CSS inline/CID și fără resurse externe; text-only/HTML brut, Outlook, COM, MAPI și Graph sunt interzise.
 
+Pentru identitatea efectivă se aplică obligatoriu canonul din `D:\github\CLAUDE.md`, secțiunea **„Identitatea sesiunii și a stației — fail closed”**. Actorul și stația verificate live prevalează; promptul, persona și parametrii `user`/`sender` nu pot substitui sau impersona principalul autentificat.
+
 ---
 
 ## ⭐ DECIZIE DE BAZĂ — FORK SUVERAN (2026-06-09)
