@@ -111,7 +111,51 @@ EOF
 	log "sieve_max_redirects=0 aplicat ($CONF). dovecot reloaded."
 }
 
+# --- 4) Auth policy „greylist" (WS8+, 2026-08-17) ----------------------------
+# Dovecot consulta serviciul local geseidl-authpolicy (127.0.0.1:8127) la fiecare
+# autentificare, inclusiv cu parola corecta. Mod monitor/enforce in
+# /etc/geseidl/authpolicy.conf. FAIL-OPEN: auth_policy_reject_on_fail ramane
+# implicit `no` — daca serviciul pica, autentificarea continua normal.
+apply_auth_policy() {
+	local CONF=/etc/dovecot/conf.d/99-zz-geseidl-authpolicy.conf
+	local NONCE_FILE=/etc/geseidl/authpolicy_nonce
+
+	if ! curl -s -m 2 -o /dev/null -X POST http://127.0.0.1:8127/; then
+		log "geseidl-authpolicy nu raspunde pe 8127 — NU configurez dovecot (siguranta)."
+		return 0
+	fi
+
+	if [ ! -f "$NONCE_FILE" ]; then
+		mkdir -p /etc/geseidl
+		openssl rand -hex 16 > "$NONCE_FILE"
+		chmod 600 "$NONCE_FILE"
+	fi
+	local NONCE
+	NONCE="$(cat "$NONCE_FILE")"
+
+	local WANT
+	WANT=$(cat <<EOF
+# Geseidl Edition: auth policy greylist (serviciu local geseidl-authpolicy).
+auth_policy_server_url = http://127.0.0.1:8127/
+auth_policy_hash_nonce = $NONCE
+auth_policy_server_timeout_msec = 500
+auth_policy_check_before_auth = yes
+auth_policy_check_after_auth = yes
+auth_policy_report_after_auth = yes
+auth_policy_request_attributes = login=%{requested_username} remote=%{rip} protocol=%s
+EOF
+)
+	if [ -f "$CONF" ] && [ "$(cat "$CONF")" = "$WANT" ]; then
+		log "auth_policy deja configurat. skip."
+		return 0
+	fi
+	printf '%s\n' "$WANT" > "$CONF"
+	systemctl restart dovecot
+	log "auth_policy configurat ($CONF). dovecot restarted."
+}
+
 apply_archive_bcc
 apply_imap_allow_nets
 apply_sieve_no_redirect
+apply_auth_policy
 log "zona mail gata."
