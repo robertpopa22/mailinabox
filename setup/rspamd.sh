@@ -80,7 +80,9 @@ fi
 cat > /etc/rspamd/local.d/classifier-bayes.conf << 'EOF'
 backend = "redis";
 servers = "127.0.0.1";
-autolearn = true;
+# Folder moves are the explicit source of Bayes labels. Automatic learning can
+# turn a transient scoring/model error into a persistent feedback loop.
+autolearn = false;
 min_learns = 100;
 EOF
 
@@ -235,8 +237,8 @@ cat > /etc/rspamd/local.d/multimap.conf << EOF
 WHITELIST_SENDER_DOMAIN {
     type = "from";
     map = "$WHITELIST_FILE";
-    score = -10.0;
-    description = "Whitelisted sender (MiaB admin)";
+    score = -2.0;
+    description = "Explicit admin allowlist (bounded reputation signal only)";
 }
 
 BLACKLIST_SENDER_DOMAIN {
@@ -249,6 +251,7 @@ BLACKLIST_SENDER_DOMAIN {
 BRAND_DISPLAY_MATCH {
     type = "header";
     header = "From";
+    filter = "email:name";
     regexp = true;
     map = "$BRAND_DISPLAY_MAP";
     score = 0.01;
@@ -266,9 +269,10 @@ BRAND_SUBJECT_MATCH {
 
 WHITELIST_BRAND_DOMAIN {
     type = "from";
+    filter = "email:domain:tld";
     map = "$BRAND_REAL_MAP";
-    score = -8.0;
-    description = "Sender domain belongs to legitimate brand/institution";
+    score = 0.0;
+    description = "Authenticated brand-domain identity condition; never a ham bonus";
 }
 
 FROM_NON_RO_TLD {
@@ -283,17 +287,19 @@ FROM_NON_RO_TLD {
 COURIER_IMPERSONATION_DISPLAY {
     type = "header";
     header = "From";
+    filter = "email:name";
     regexp = true;
     map = "$COURIER_DISPLAY_MAP";
-    score = 5.0;
-    description = "Display name impersonates a courier brand (legacy rule)";
+    score = 0.01;
+    description = "Courier name in display name (composite input only)";
 }
 
 WHITELIST_COURIER_DOMAIN {
     type = "from";
+    filter = "email:domain:tld";
     map = "$COURIER_REAL_MAP";
-    score = -10.0;
-    description = "Legitimate courier sender domain";
+    score = 0.0;
+    description = "Legitimate courier-domain identity condition; never a ham bonus";
 }
 
 RO_PHISH_SUBJECT {
@@ -331,9 +337,15 @@ SPAM_FRIENDLY_SETUP {
 }
 
 BRAND_IMPERSONATION {
-    expression = "(BRAND_DISPLAY_MATCH | BRAND_SUBJECT_MATCH) & !WHITELIST_BRAND_DOMAIN";
+    expression = "(BRAND_DISPLAY_MATCH | BRAND_SUBJECT_MATCH) & !WHITELIST_BRAND_DOMAIN & !LOCAL_OUTBOUND";
     score = 7.0;
     description = "Brand/institution name claimed but sender domain not legitimate";
+}
+
+COURIER_IMPERSONATION {
+    expression = "COURIER_IMPERSONATION_DISPLAY & !WHITELIST_COURIER_DOMAIN & !LOCAL_OUTBOUND";
+    score = 5.0;
+    description = "Courier name claimed by a sender outside the legitimate courier domain";
 }
 
 FOREIGN_PHISH_RO {
@@ -400,8 +412,9 @@ model_parameters {
 }
 
 timeout = 15;
-reason_header = "X-GPT-Reason";
-autolearn = true;
+# Model explanations are untrusted content and must not be emitted to users or
+# feed Bayes. Only bounded verdict symbols participate in policy.
+autolearn = false;
 
 symbols_to_except {
   BAYES_SPAM = 0.9;
@@ -411,6 +424,7 @@ symbols_to_except {
   FUZZY_DENIED = -1;
   REPLY = -1;
   BOUNCE = -1;
+  LOCAL_OUTBOUND = -1;
 }
 EOF
 	chown root:_rspamd /etc/rspamd/local.d/gpt.conf
@@ -444,6 +458,24 @@ group "GPT" {
 }
 EOF
 	fi
+fi
+
+# LOCAL_OUTBOUND is derived from authenticated/local SMTP provenance, not from
+# From/Subject text. It is a bounded reputation signal only: all content,
+# malware and attachment checks remain active and can readily outweigh it.
+if ! grep -q 'geseidl-bounded-local-provenance' /etc/rspamd/local.d/groups.conf 2>/dev/null; then
+	cat >> /etc/rspamd/local.d/groups.conf << 'EOF'
+
+# geseidl-bounded-local-provenance
+group "Geseidl provenance" {
+  symbols = {
+    "LOCAL_OUTBOUND" {
+      weight = -2.0;
+      description = "Bounded trust for authenticated/local SMTP provenance";
+    }
+  }
+}
+EOF
 fi
 
 # === DOVECOT IMAPSIEVE ===
@@ -544,7 +576,7 @@ systemctl disable spamassassin 2>/dev/null
 # (SIGPIPE on find); with `set -o pipefail` (functions.sh) that aborted the ENTIRE setup
 # mid-run. Guard with a marker so re-runs skip the slow 5000-file scan, and wrap each
 # pipeline in `( ... ) || true` so training never stops setup. Ongoing learning is handled
-# by autolearn + the IMAPSieve learn hooks anyway.
+# by the explicit IMAPSieve learn hooks.
 RSPAMD_TRAIN_MARKER="$STORAGE_ROOT/mail/.rspamd-bayes-trained"
 if [ -d "$STORAGE_ROOT/mail/mailboxes" ] && [ ! -f "$RSPAMD_TRAIN_MARKER" ]; then
 	echo "Training rspamd Bayes from existing mailboxes (one-time)..."

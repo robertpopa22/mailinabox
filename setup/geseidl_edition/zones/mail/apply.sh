@@ -153,8 +153,41 @@ EOF
 	log "auth_policy configurat ($CONF). dovecot restarted."
 }
 
+# --- 5) IP real in webmail (2026-08-17) --------------------------------------
+# Dovecot accepta IP-ul original al browserului forwardat de Roundcube prin
+# IMAP ID (plugin dovecot_ident, instalat de setup/webmail.sh). Astfel
+# allow_nets / auth policy / logging se aplica pe vizitatorul REAL, nu pe
+# 127.0.0.1 — conturile restrictionate au webmail DOAR din retele interne,
+# conturile nerestrictionate (ex. clienti biamco.ro) si din exterior.
+apply_webmail_real_ip() {
+	local CONF=/etc/dovecot/conf.d/99-zz-geseidl-trusted.conf
+	local WANT='# Geseidl Edition: Roundcube (localhost) forwardeaza IP-ul real prin IMAP ID.
+login_trusted_networks = 127.0.0.1 ::1'
+	local RCM_PLUG=/usr/local/lib/roundcubemail/plugins
+	local RCM_CFG=/usr/local/lib/roundcubemail/config/config.inc.php
+
+	# plugin (aplicare live, idempotenta; setup/webmail.sh il pune si el)
+	if [ -d "$RCM_PLUG" ]; then
+		rm -rf "$RCM_PLUG/dovecot_ident"
+		cp -r /root/mailinabox/conf/roundcube-plugins/dovecot_ident "$RCM_PLUG/dovecot_ident"
+		if [ -f "$RCM_CFG" ] && ! grep -q "dovecot_ident" "$RCM_CFG"; then
+			sed -i "s/\(\$config\['plugins'\] = array(\)/\1'dovecot_ident', /" "$RCM_CFG"
+			log "dovecot_ident adaugat in config.inc.php."
+		fi
+	fi
+
+	if [ -f "$CONF" ] && [ "$(cat "$CONF")" = "$WANT" ]; then
+		log "login_trusted_networks deja aplicat. skip."
+		return 0
+	fi
+	printf '%s\n' "$WANT" > "$CONF"
+	systemctl restart dovecot
+	log "login_trusted_networks aplicat ($CONF). dovecot restarted."
+}
+
 apply_archive_bcc
 apply_imap_allow_nets
 apply_sieve_no_redirect
 apply_auth_policy
+apply_webmail_real_ip
 log "zona mail gata."

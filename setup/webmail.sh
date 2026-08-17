@@ -98,6 +98,12 @@ fi
 
 # ### Configuring Roundcube
 
+# Geseidl Edition: plugin dovecot_ident — trimite IP-ul real al browserului
+# catre Dovecot prin comanda IMAP ID (x-originating-ip), ca allow_nets /
+# auth policy / logging sa vada vizitatorul real, nu 127.0.0.1.
+rm -rf ${RCM_PLUGIN_DIR}/dovecot_ident
+cp -r conf/roundcube-plugins/dovecot_ident ${RCM_PLUGIN_DIR}/dovecot_ident
+
 # Generate a secret key of PHP-string-safe characters appropriate
 # for the cipher algorithm selected below.
 SECRET_KEY=$(dd if=/dev/urandom bs=1 count=32 2>/dev/null | base64 | sed s/=//g)
@@ -139,7 +145,7 @@ cat > $RCM_CONFIG <<EOF;
 \$config['product_name'] = (isset(\$_SERVER['HTTP_HOST']) && preg_match('/^[A-Za-z0-9.-]+\$/', \$_SERVER['HTTP_HOST'])) ? \$_SERVER['HTTP_HOST'].' Webmail' : '$PRIMARY_HOSTNAME Webmail';
 \$config['cipher_method'] = 'AES-256-CBC'; # persistent login cookie and potentially other things
 \$config['des_key'] = '$SECRET_KEY'; # 37 characters -> ~256 bits for AES-256, see above
-\$config['plugins'] = array('html5_notifier', 'archive', 'zipdownload', 'password', 'managesieve', 'jqueryui', 'persistent_login', 'carddav');
+\$config['plugins'] = array('html5_notifier', 'archive', 'zipdownload', 'password', 'managesieve', 'jqueryui', 'persistent_login', 'carddav', 'dovecot_ident');
 \$config['skin'] = 'elastic';
 \$config['login_autocomplete'] = 2;
 \$config['login_username_filter'] = 'email';
