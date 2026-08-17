@@ -86,6 +86,32 @@ apply_imap_allow_nets() {
 	fi
 }
 
+# --- 3) Interzicere redirect din sieve utilizatori (WS3, 2026-08-17) ---------
+# Politica: forwardarile se fac DOAR prin aliasuri administrate (panoul admin).
+# sieve_max_redirects=0 dezactiveaza actiunea `redirect` in TOATE scripturile
+# sieve (utilizator + ManageSieve refuza la upload scripturi cu redirect).
+# Filtrele de sortare (fileinto), vacation etc. raman functionale.
+apply_sieve_no_redirect() {
+	local CONF=/etc/dovecot/conf.d/99-zz-geseidl-sieve.conf
+	local WANT
+	WANT=$(cat <<'EOF'
+plugin {
+  # Geseidl Edition (WS3 2026-08-17): redirect interzis din filtrele
+  # utilizatorului; forwardari doar prin aliasuri administrate de IT.
+  sieve_max_redirects = 0
+}
+EOF
+)
+	if [ -f "$CONF" ] && [ "$(cat "$CONF")" = "$WANT" ]; then
+		log "sieve_max_redirects=0 deja aplicat. skip."
+		return 0
+	fi
+	printf '%s\n' "$WANT" > "$CONF"
+	systemctl reload dovecot 2>/dev/null || doveadm reload || true
+	log "sieve_max_redirects=0 aplicat ($CONF). dovecot reloaded."
+}
+
 apply_archive_bcc
 apply_imap_allow_nets
+apply_sieve_no_redirect
 log "zona mail gata."
