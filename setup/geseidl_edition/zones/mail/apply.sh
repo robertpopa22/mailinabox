@@ -138,7 +138,6 @@ apply_auth_policy() {
 # Geseidl Edition: auth policy greylist (serviciu local geseidl-authpolicy).
 auth_policy_server_url = http://127.0.0.1:8127/
 auth_policy_hash_nonce = $NONCE
-auth_policy_server_timeout_msec = 500
 auth_policy_check_before_auth = yes
 auth_policy_check_after_auth = yes
 auth_policy_report_after_auth = yes
