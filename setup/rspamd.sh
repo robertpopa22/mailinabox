@@ -337,9 +337,9 @@ SPAM_FRIENDLY_SETUP {
 }
 
 BRAND_IMPERSONATION {
-    expression = "(BRAND_DISPLAY_MATCH | BRAND_SUBJECT_MATCH) & !WHITELIST_BRAND_DOMAIN & !LOCAL_OUTBOUND";
+    expression = "BRAND_DISPLAY_MATCH & !WHITELIST_BRAND_DOMAIN & !LOCAL_OUTBOUND";
     score = 7.0;
-    description = "Brand/institution name claimed but sender domain not legitimate";
+    description = "Brand/institution identity claimed in From display but sender domain not legitimate";
 }
 
 COURIER_IMPERSONATION {
