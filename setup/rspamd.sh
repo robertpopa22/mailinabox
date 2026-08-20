@@ -191,7 +191,7 @@ sys.path.insert(0, os.path.join('$PWD', 'management'))
 from utils import load_settings, load_environment
 env = load_environment()
 settings = load_settings(env)
-GESEIDL_WL_SEED = ['utcb.ro', 'seo.geseidl@gmail.com']
+GESEIDL_WL_SEED = ['utcb.ro', 'seo.geseidl@gmail.com', 'artsani-energy.ro']
 wl = list(dict.fromkeys((settings.get('spam_whitelist', []) or []) + GESEIDL_WL_SEED))
 bl = settings.get('spam_blacklist', []) or []
 with open('$WHITELIST_FILE', 'w') as f:
