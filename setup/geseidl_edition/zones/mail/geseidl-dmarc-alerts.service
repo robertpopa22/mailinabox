@@ -10,7 +10,7 @@ User=root
 Group=root
 UMask=0077
 Nice=10
-NoNewPrivileges=true
+# doveadm starts as root and must setuid to the mailbox owner (mail, uid 8).
 PrivateDevices=true
 PrivateTmp=true
 ProtectControlGroups=true
