@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Geseidl DMARC report monitor every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=90s
+Persistent=true
+Unit=geseidl-dmarc-alerts.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Geseidl DMARC aggregate report monitor
+After=dovecot.service postfix.service
+Wants=dovecot.service postfix.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/geseidl-dmarc-alerts
+User=root
+Group=root
+UMask=0077
+Nice=10
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true

@@ -13,6 +13,7 @@
 #        management/geseidl_edition/imap_restrict.py {list|add|remove}
 set -uo pipefail
 
+ZONE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STORAGE_ROOT="${STORAGE_ROOT:-/home/user-data}"
 SETTINGS="$STORAGE_ROOT/settings.yaml"
 USERS_DB="$STORAGE_ROOT/mail/users.sqlite"
@@ -185,9 +186,43 @@ login_trusted_networks = 127.0.0.1 ::1'
 	log "login_trusted_networks aplicat ($CONF). dovecot restarted."
 }
 
+# --- 6) Monitor rapoarte agregate DMARC (2026-08-31) -------------------------
+# Rapoartele rua ajung in mailboxul tehnic gesit-alerte@. Serviciul local
+# arhiveaza rapoartele sanatoase si notifica dit@ numai pentru DMARC fail,
+# disposition reject/quarantine, policy drift sau erori declarate in raport.
+apply_dmarc_alerts() {
+	local SCRIPT_SRC="$ZONE_DIR/dmarc_alerts.py"
+	local SCRIPT_DST=/usr/local/libexec/geseidl-dmarc-alerts
+	local SERVICE=geseidl-dmarc-alerts.service
+	local TIMER=geseidl-dmarc-alerts.timer
+
+	if [ ! -f "$SCRIPT_SRC" ]; then
+		log "EROARE: sursa monitorului DMARC lipseste ($SCRIPT_SRC)."
+		return 1
+	fi
+	if ! sqlite3 "$USERS_DB" "SELECT 1 FROM users WHERE email='gesit-alerte@geseidl.ro' LIMIT 1;" | grep -qx 1; then
+		log "EROARE: mailboxul gesit-alerte@geseidl.ro nu exista; monitorul ramane neinstalat."
+		return 1
+	fi
+
+	install -d -o root -g root -m 0755 /usr/local/libexec
+	install -d -o root -g root -m 0700 /var/lib/geseidl-dmarc-alerts
+	install -o root -g root -m 0755 "$SCRIPT_SRC" "$SCRIPT_DST"
+	install -o root -g root -m 0644 "$ZONE_DIR/$SERVICE" "/etc/systemd/system/$SERVICE"
+	install -o root -g root -m 0644 "$ZONE_DIR/$TIMER" "/etc/systemd/system/$TIMER"
+
+	"$SCRIPT_DST" --self-test >/dev/null
+	doveadm mailbox create -u gesit-alerte@geseidl.ro Archive 2>/dev/null || true
+	doveadm mailbox create -u gesit-alerte@geseidl.ro Invalid 2>/dev/null || true
+	systemctl daemon-reload
+	systemctl enable --now "$TIMER" >/dev/null
+	log "monitor DMARC instalat; timer 15 minute, notificare doar la probleme."
+}
+
 apply_archive_bcc
 apply_imap_allow_nets
 apply_sieve_no_redirect
 apply_auth_policy
 apply_webmail_real_ip
+apply_dmarc_alerts
 log "zona mail gata."
