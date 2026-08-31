@@ -205,17 +205,17 @@ apply_dmarc_alerts() {
 		return 1
 	fi
 
-	install -d -o root -g root -m 0755 /usr/local/libexec
-	install -d -o root -g root -m 0700 /var/lib/geseidl-dmarc-alerts
-	install -o root -g root -m 0755 "$SCRIPT_SRC" "$SCRIPT_DST"
-	install -o root -g root -m 0644 "$ZONE_DIR/$SERVICE" "/etc/systemd/system/$SERVICE"
-	install -o root -g root -m 0644 "$ZONE_DIR/$TIMER" "/etc/systemd/system/$TIMER"
+	install -d -o root -g root -m 0755 /usr/local/libexec || return 1
+	install -d -o root -g root -m 0700 /var/lib/geseidl-dmarc-alerts || return 1
+	install -o root -g root -m 0755 "$SCRIPT_SRC" "$SCRIPT_DST" || return 1
+	install -o root -g root -m 0644 "$ZONE_DIR/$SERVICE" "/etc/systemd/system/$SERVICE" || return 1
+	install -o root -g root -m 0644 "$ZONE_DIR/$TIMER" "/etc/systemd/system/$TIMER" || return 1
 
-	"$SCRIPT_DST" --self-test >/dev/null
+	"$SCRIPT_DST" --self-test >/dev/null || return 1
 	doveadm mailbox create -u gesit-alerte@geseidl.ro Archive 2>/dev/null || true
 	doveadm mailbox create -u gesit-alerte@geseidl.ro Invalid 2>/dev/null || true
-	systemctl daemon-reload
-	systemctl enable --now "$TIMER" >/dev/null
+	systemctl daemon-reload || return 1
+	systemctl enable --now "$TIMER" >/dev/null || return 1
 	log "monitor DMARC instalat; timer 15 minute, notificare doar la probleme."
 }
 
@@ -224,5 +224,8 @@ apply_imap_allow_nets
 apply_sieve_no_redirect
 apply_auth_policy
 apply_webmail_real_ip
-apply_dmarc_alerts
+apply_dmarc_alerts || {
+	log "EROARE: instalarea monitorului DMARC a esuat; zona mail este incompleta."
+	exit 1
+}
 log "zona mail gata."
