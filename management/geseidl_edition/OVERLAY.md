@@ -46,6 +46,7 @@ setup/geseidl_edition/                 # overlay PROVISIONING (shell/config, rul
 ```yaml
 edition: geseidl
 upstream_base: v75          # versiunea upstream pe care e bazat overlay-ul
+upstream_commit_reviews: 86d78e9, e64f88b  # SHA-uri evaluate pentru comparatia curenta
 zones:                      # zone active (runtime si/sau provisioning)
   - status
   # - spam      (de migrat)
@@ -96,7 +97,7 @@ Cauze rădăcină ale false-pozitivelor pe acest box:
 
 | Check upstream | Re-verificare overlay | Rezultat |
 |---|---|---|
-| Stare upstream MiaB | GitHub Compare API între hash-ul local `HEAD` și `mail-in-a-box/mailinabox:main`; numărăm și titlurile cu `security`/`CVE`/`vulnerability` | ✓ doar la `behind=0`; altfel ✖ cu tag-ul de bază, commiturile restante și cele marcate securitate; eșecul verificării rămâne avertisment |
+| Stare upstream MiaB | GitHub Compare API între hash-ul local `HEAD` și `mail-in-a-box/mailinabox:main`; numărăm și titlurile cu `security`/`CVE`/`vulnerability`, apoi comparăm SHA-urile cu `upstream_commit_reviews` | ✓ doar la `behind=0`; o divergență de graf rămâne ⚠ chiar dacă toate commiturile au verdict; ✖ numai când rămâne securitate neevaluată; eșecul verificării rămâne avertisment |
 | NS / glue records „incorecte" | dacă NS public ≠ box ⇒ DNS extern intenționat | ✓ „DNS gestionat extern" |
 | „trebuie să rezolve la IP-ul box" (subdomenii servite) | A public == IP public box? | ✓ dacă da, altfel rămâne ✖ |
 | „ar trebui să rezolve la box" (site găzduit altundeva) | înlocuit cu **site-live** (HTTP/HTTPS GET) | ✓ dacă site răspunde |
