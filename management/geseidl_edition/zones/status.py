@@ -156,12 +156,13 @@ def _version_badge(env, manifest=None):
 				"fara commituri de securitate marcate" if not security_marked else
 				f"{security_marked} commit de securitate acoperit local" if security_marked == 1 else
 				f"{security_marked} commituri de securitate acoperite local")
+			review_summary = (manifest or {}).get("upstream_review_summary") or "toate commiturile au verdict"
 			extra = list(logo) + [
 				*detail,
-				{"text": f"evaluare: toate commiturile din comparatia curenta au verdict; {security_coverage}.", "monospace": True},
+				{"text": f"evaluare: {review_summary}; {security_coverage}; fara merge complet in fork.", "monospace": True},
 			]
-			return ("warning",
-				f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); graful Git rămâne divergent cu {behind} commituri upstream/main, dar toate sunt evaluate; {security_coverage}.",
+			return ("ok",
+				f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); graful Git rămâne divergent cu {behind} commituri upstream/main deoarece forkul Geseidl integrează selectiv, nu face merge complet. Verdict: {review_summary}; {security_coverage}.",
 				extra)
 		return ("ok",
 			f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); upstream/main este complet integrat, iar forkul are {ahead} commituri Geseidl proprii.",

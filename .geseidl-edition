@@ -15,6 +15,7 @@ upstream_base: v75
 # 39b1d3c este aplicat in 5de9b21; fc8d431 (security) in 08a399f;
 # c62cc9f/fbb137d nu se aplica la Nextcloud 33.
 upstream_commit_reviews: 86d78e9, e64f88b, 1de9a93, 39b1d3c, fc8d431, c62cc9f, fbb137d
+upstream_review_summary: 2 aplicate, 2 deja acoperite local, 2 neaplicabile (Nextcloud 27 fata de 33), 1 numai tag
 zones:
   - status
   - dns

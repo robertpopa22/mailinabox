@@ -97,7 +97,7 @@ Cauze rădăcină ale false-pozitivelor pe acest box:
 
 | Check upstream | Re-verificare overlay | Rezultat |
 |---|---|---|
-| Stare upstream MiaB | GitHub Compare API între hash-ul local `HEAD` și `mail-in-a-box/mailinabox:main`; numărăm și titlurile cu `security`/`CVE`/`vulnerability`, apoi comparăm SHA-urile cu `upstream_commit_reviews` | ✓ doar la `behind=0`; o divergență de graf rămâne ⚠ chiar dacă toate commiturile au verdict; ✖ numai când rămâne securitate neevaluată; eșecul verificării rămâne avertisment |
+| Stare upstream MiaB | GitHub Compare API între hash-ul local `HEAD` și `mail-in-a-box/mailinabox:main`; numărăm și titlurile cu `security`/`CVE`/`vulnerability`, apoi comparăm SHA-urile cu `upstream_commit_reviews` | ✓ când toate commiturile au verdict documentat (inclusiv divergență intenționată de fork); ⚠ pentru commituri neevaluate sau verificare indisponibilă; ✖ numai când rămâne securitate neevaluată |
 | NS / glue records „incorecte" | dacă NS public ≠ box ⇒ DNS extern intenționat | ✓ „DNS gestionat extern" |
 | „trebuie să rezolve la IP-ul box" (subdomenii servite) | A public == IP public box? | ✓ dacă da, altfel rămâne ✖ |
 | „ar trebui să rezolve la box" (site găzduit altundeva) | înlocuit cu **site-live** (HTTP/HTTPS GET) | ✓ dacă site răspunde |

@@ -40,7 +40,8 @@ def load_manifest(start=None):
 	"""Parse the manifest. Returns a dict with keys: edition, upstream_base, zones, active, path."""
 	path = find_marker(start)
 	data = {"edition": None, "overlay_version": None, "upstream_base": None,
-		"upstream_commit_reviews": [], "zones": [], "active": False, "path": path}
+		"upstream_commit_reviews": [], "upstream_review_summary": None,
+		"zones": [], "active": False, "path": path}
 	if not path:
 		return data
 	data["active"] = True
@@ -65,7 +66,7 @@ def load_manifest(start=None):
 						if val.startswith("[") and val.endswith("]"):
 							data["zones"] = [z.strip() for z in val[1:-1].split(",") if z.strip()]
 							in_zones = False
-					elif key in ("edition", "upstream_base", "overlay_version"):
+					elif key in ("edition", "upstream_base", "overlay_version", "upstream_review_summary"):
 						data[key] = val
 					elif key == "upstream_commit_reviews":
 						data[key] = [sha.strip().lower() for sha in val.split(",") if sha.strip()]
