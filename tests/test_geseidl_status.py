@@ -23,14 +23,29 @@ class GeseidlVersionStatusTest(unittest.TestCase):
 
 	def test_unintegrated_security_commit_is_an_error(self):
 		with patch.dict(sys.modules, {"status_checks": self.status_checks}), \
-			 patch.object(status, "_upstream_commit_gap", return_value=((84, 7, 1), None)):
+			 patch.object(status, "_upstream_commit_gap", return_value=((84, 7, [{
+				"sha": "fc8d431", "subject": "[security] Update roundcube", "security_marked": True,
+			}]), None)):
 			kind, text, extra = status._version_badge({}, self.manifest)
 
 		self.assertEqual(kind, "error")
 		self.assertIn("baza tag v76", text)
 		self.assertIn("7 commituri", text)
-		self.assertIn("1 commit marcat explicit ca securitate", text)
+		self.assertIn("1 de securitate neevaluat", text)
 		self.assertTrue(any("upstream: -7" in item["text"] for item in extra))
+
+	def test_reviewed_security_commit_keeps_graph_gap_visible_as_warning(self):
+		self.manifest["upstream_commit_reviews"] = [{"sha": "fc8d431", "verdict": "applied"}]
+		with patch.dict(sys.modules, {"status_checks": self.status_checks}), \
+			 patch.object(status, "_upstream_commit_gap", return_value=((84, 7, [{
+				"sha": "fc8d431", "subject": "[security] Update roundcube", "security_marked": True,
+			}]), None)):
+			kind, text, extra = status._version_badge({}, self.manifest)
+
+		self.assertEqual(kind, "warning")
+		self.assertIn("graful Git rămâne divergent cu 7 commituri", text)
+		self.assertIn("1 commit de securitate acoperit local", text)
+		self.assertTrue(any("neevaluate: 0" in item["text"] for item in extra))
 
 	def test_unverifiable_upstream_is_not_reported_as_ok(self):
 		with patch.object(status, "_upstream_commit_gap", return_value=(None, "fetch timeout")):

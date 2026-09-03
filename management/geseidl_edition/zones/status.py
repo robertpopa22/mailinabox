@@ -48,7 +48,7 @@ _VER_MARKERS = (
 
 
 def _upstream_commit_gap(manifest):
-	"""Return `(ahead, behind, security_marked)` against canonical upstream.
+	"""Return graph gap and the current upstream commits against canonical upstream.
 
 	The GitHub comparison API compares this exact local commit with upstream's
 	`main`. It avoids mutating refs and works on MAIL02, where Git protocol v2
@@ -76,14 +76,30 @@ def _upstream_commit_gap(manifest):
 			comparison = json.load(response)
 		ahead = int(comparison["behind_by"])
 		behind = int(comparison["ahead_by"])
-		security_marked = sum(
-			1 for commit in comparison.get("commits", [])
-			if re.search(
-				r"\b(security|cve|vulnerability)\b",
-				commit.get("commit", {}).get("message", "").split("\n", 1)[0], re.I))
-		return (ahead, behind, security_marked), None
+		commits = [
+			{
+				"sha": commit.get("sha", "").lower(),
+				"subject": commit.get("commit", {}).get("message", "").split("\n", 1)[0],
+			}
+			for commit in comparison.get("commits", [])
+		]
+		for commit in commits:
+			commit["security_marked"] = bool(re.search(
+				r"\b(security|cve|vulnerability)\b", commit["subject"], re.I))
+		return (ahead, behind, commits), None
 	except (OSError, subprocess.SubprocessError, ValueError, KeyError) as exc:
 		return None, str(exc)
+
+
+def _upstream_review_map(manifest):
+	"""Return explicitly reviewed upstream SHAs from the versioned overlay manifest."""
+	reviews = (manifest or {}).get("upstream_commit_reviews") or []
+	result = {}
+	for entry in reviews:
+		sha = entry.get("sha", "") if isinstance(entry, dict) else entry
+		if isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{7,64}", sha, re.I):
+			result[sha.lower()] = entry
+	return result
 
 
 def _version_badge(env, manifest=None):
@@ -105,20 +121,39 @@ def _version_badge(env, manifest=None):
 	logo = [{"text": f"◈ Mail-in-a-Box {EDITION} v{ov} — overlay activ", "monospace": True}]
 	commit_gap, gap_error = _upstream_commit_gap(manifest)
 	if commit_gap is not None:
-		ahead, behind, security_marked = commit_gap
+		ahead, behind, upstream_commits = commit_gap
 		release_tag = base or latest or "nedeterminat"
 		if behind:
+			review_map = _upstream_review_map(manifest)
+			unreviewed = [commit for commit in upstream_commits if commit["sha"] not in review_map]
+			security_marked = sum(commit["security_marked"] for commit in upstream_commits)
+			security_pending = sum(commit["security_marked"] for commit in unreviewed)
 			security_label = (
 				f"{security_marked} commit marcat explicit ca securitate"
 				if security_marked == 1 else
 				f"{security_marked} commituri marcate explicit ca securitate")
-			security_note = f", inclusiv {security_label}" if security_marked else ""
-			extra = list(logo) + [
-				{"text": f"baza tag: {release_tag}; fork: +{ahead} / upstream: -{behind} commituri", "monospace": True},
-				{"text": f"upstream: {security_label}", "monospace": True},
+			detail = [
+				{"text": f"baza tag: {release_tag}; fork: +{ahead} / upstream: -{behind} commituri (diferenta de graf)", "monospace": True},
+				{"text": f"upstream: {security_label}; neevaluate: {len(unreviewed)}", "monospace": True},
 			]
-			return ("error",
-				f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); {behind} commituri upstream/main nu sunt integrate{security_note}. Este necesară evaluarea și cherry-pick-ul selectiv.",
+			if security_pending:
+				return ("error",
+					f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); graful Git are {behind} commituri upstream/main în afara istoricului local, inclusiv {security_pending} de securitate neevaluat. Este necesară evaluarea și integrarea selectivă.",
+					list(logo) + detail)
+			if unreviewed:
+				return ("warning",
+					f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); graful Git diferă cu {behind} commituri upstream/main. {len(unreviewed)} commituri neevaluate nu sunt marcate ca securitate.",
+					list(logo) + detail)
+			security_coverage = (
+				"fara commituri de securitate marcate" if not security_marked else
+				f"{security_marked} commit de securitate acoperit local" if security_marked == 1 else
+				f"{security_marked} commituri de securitate acoperite local")
+			extra = list(logo) + [
+				*detail,
+				{"text": f"evaluare: toate commiturile din comparatia curenta au verdict; {security_coverage}.", "monospace": True},
+			]
+			return ("warning",
+				f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); graful Git rămâne divergent cu {behind} commituri upstream/main, dar toate sunt evaluate; {security_coverage}.",
 				extra)
 		return ("ok",
 			f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); upstream/main este complet integrat, iar forkul are {ahead} commituri Geseidl proprii.",

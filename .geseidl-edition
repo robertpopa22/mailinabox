@@ -1,12 +1,20 @@
 # Geseidl Edition overlay manifest.
 # Prezenta acestui fisier = overlay activ. Vezi management/geseidl_edition/OVERLAY.md
 edition: geseidl
-overlay_version: 0.10.1
+overlay_version: 0.10.2
+# 0.10.2: status upstream pastreaza divergenta de graf vizibila si separa commiturile evaluate/aplicate de restanțele reale
 # 0.10.1: status upstream compara commitul local cu upstream/main si semnaleaza explicit restanțele de securitate
 # 0.10.0: zona mail — procesare rua in gesit-alerte@; dit@ notificat numai la rezultate DMARC problematice
 # 0.9.0: zona mail — restrictie acces IMAP per-cont la source IP (Dovecot allow_nets, tabel sidecar + CLI imap_restrict.py)
 # 0.8.0: zona spam completa — patch-uri integrare extrase+verificate (mail-postfix/spamassassin/daemon-api/index) + apply.sh signature-gate
 upstream_base: v75
+# Verdicturi pentru exact comparatia upstream/main evaluata la 2026-09-03.
+# Nu transforma divergenta Git in "verde"; doar impiedica raportarea falsa a
+# unui patch deja acoperit local drept restant.
+# 86d78e9/e64f88b sunt deja acoperite local; 1de9a93 este tag-only;
+# 39b1d3c este aplicat in 5de9b21; fc8d431 (security) in 08a399f;
+# c62cc9f/fbb137d nu se aplica la Nextcloud 33.
+upstream_commit_reviews: 86d78e9, e64f88b, 1de9a93, 39b1d3c, fc8d431, c62cc9f, fbb137d
 zones:
   - status
   - dns
