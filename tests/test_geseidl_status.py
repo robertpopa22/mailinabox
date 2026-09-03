@@ -38,7 +38,7 @@ class GeseidlVersionStatusTest(unittest.TestCase):
 		self.manifest["upstream_commit_reviews"] = [{"sha": "fc8d431", "verdict": "applied"}]
 		with patch.dict(sys.modules, {"status_checks": self.status_checks}), \
 			 patch.object(status, "_upstream_commit_gap", return_value=((84, 7, [{
-				"sha": "fc8d431", "subject": "[security] Update roundcube", "security_marked": True,
+				"sha": "fc8d431a3c1de4f5678901234567890abcdef1234", "subject": "[security] Update roundcube", "security_marked": True,
 			}]), None)):
 			kind, text, extra = status._version_badge({}, self.manifest)
 

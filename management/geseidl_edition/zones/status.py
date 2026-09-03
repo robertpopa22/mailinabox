@@ -102,6 +102,11 @@ def _upstream_review_map(manifest):
 	return result
 
 
+def _is_reviewed_upstream_commit(sha, review_map):
+	"""Match a full GitHub SHA to a validated full or abbreviated manifest SHA."""
+	return any(sha.startswith(reviewed_sha) for reviewed_sha in review_map)
+
+
 def _version_badge(env, manifest=None):
 	"""Returneaza (kind, text, extra) pentru linia de versiune fork-aware."""
 	ov = (manifest or {}).get("overlay_version") or "?"
@@ -125,7 +130,10 @@ def _version_badge(env, manifest=None):
 		release_tag = base or latest or "nedeterminat"
 		if behind:
 			review_map = _upstream_review_map(manifest)
-			unreviewed = [commit for commit in upstream_commits if commit["sha"] not in review_map]
+			unreviewed = [
+				commit for commit in upstream_commits
+				if not _is_reviewed_upstream_commit(commit["sha"], review_map)
+			]
 			security_marked = sum(commit["security_marked"] for commit in upstream_commits)
 			security_pending = sum(commit["security_marked"] for commit in unreviewed)
 			security_label = (
