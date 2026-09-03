@@ -108,12 +108,14 @@ def _version_badge(env, manifest=None):
 		ahead, behind, security_marked = commit_gap
 		release_tag = base or latest or "nedeterminat"
 		if behind:
-			security_note = (
-				f", inclusiv {security_marked} marcat explicit ca securitate"
-				if security_marked else "")
+			security_label = (
+				f"{security_marked} commit marcat explicit ca securitate"
+				if security_marked == 1 else
+				f"{security_marked} commituri marcate explicit ca securitate")
+			security_note = f", inclusiv {security_label}" if security_marked else ""
 			extra = list(logo) + [
 				{"text": f"baza tag: {release_tag}; fork: +{ahead} / upstream: -{behind} commituri", "monospace": True},
-				{"text": f"upstream: {security_marked} commituri marcate securitate", "monospace": True},
+				{"text": f"upstream: {security_label}", "monospace": True},
 			]
 			return ("error",
 				f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); {behind} commituri upstream/main nu sunt integrate{security_note}. Este necesară evaluarea și cherry-pick-ul selectiv.",

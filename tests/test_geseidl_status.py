@@ -29,7 +29,7 @@ class GeseidlVersionStatusTest(unittest.TestCase):
 		self.assertEqual(kind, "error")
 		self.assertIn("baza tag v76", text)
 		self.assertIn("7 commituri", text)
-		self.assertIn("1 marcat explicit ca securitate", text)
+		self.assertIn("1 commit marcat explicit ca securitate", text)
 		self.assertTrue(any("upstream: -7" in item["text"] for item in extra))
 
 	def test_unverifiable_upstream_is_not_reported_as_ok(self):
