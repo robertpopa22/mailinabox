@@ -96,7 +96,7 @@ Cauze rădăcină ale false-pozitivelor pe acest box:
 
 | Check upstream | Re-verificare overlay | Rezultat |
 |---|---|---|
-| Versiune nouă MiaB disponibilă | comparăm baza upstream din tag-ul fork (`geseidl-vNN-...`) cu ultima upstream | ✓ „Geseidl Edition — aliniat cu upstream vNN" + badge |
+| Stare upstream MiaB | GitHub Compare API între hash-ul local `HEAD` și `mail-in-a-box/mailinabox:main`; numărăm și titlurile cu `security`/`CVE`/`vulnerability` | ✓ doar la `behind=0`; altfel ✖ cu tag-ul de bază, commiturile restante și cele marcate securitate; eșecul verificării rămâne avertisment |
 | NS / glue records „incorecte" | dacă NS public ≠ box ⇒ DNS extern intenționat | ✓ „DNS gestionat extern" |
 | „trebuie să rezolve la IP-ul box" (subdomenii servite) | A public == IP public box? | ✓ dacă da, altfel rămâne ✖ |
 | „ar trebui să rezolve la box" (site găzduit altundeva) | înlocuit cu **site-live** (HTTP/HTTPS GET) | ✓ dacă site răspunde |

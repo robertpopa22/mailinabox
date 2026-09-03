@@ -5,8 +5,12 @@ realitatea PUBLICA (DNS 1.1.1.1, HTTP, TLS) si o trecem pe verde DOAR daca chiar
 in regula. Ce nu recunoastem ramane neatins (nu ascundem probleme noi).
 """
 
+import json
 import os
 import re
+import subprocess
+import urllib.parse
+import urllib.request
 
 from .. import dnsutil
 from ..engine import mk
@@ -43,6 +47,45 @@ _VER_MARKERS = (
 )
 
 
+def _upstream_commit_gap(manifest):
+	"""Return `(ahead, behind, security_marked)` against canonical upstream.
+
+	The GitHub comparison API compares this exact local commit with upstream's
+	`main`. It avoids mutating refs and works on MAIL02, where Git protocol v2
+	fetches can fail even though HTTPS access to GitHub is available.
+	"""
+	marker = (manifest or {}).get("path")
+	if not marker:
+		return None, "lipseste markerul forkului"
+	repo = os.path.dirname(marker)
+	try:
+		head = subprocess.run(
+			["git", "-C", repo, "rev-parse", "HEAD"],
+			check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+			text=True, timeout=5).stdout.strip()
+		if not re.fullmatch(r"[0-9a-f]{40,64}", head):
+			return None, "HEAD Git invalid"
+		compare_url = (
+			"https://api.github.com/repos/mail-in-a-box/mailinabox/compare/"
+			f"{urllib.parse.quote(head)}...main")
+		request = urllib.request.Request(compare_url, headers={
+			"Accept": "application/vnd.github+json",
+			"User-Agent": "Geseidl-Mailinabox-Upstream-Status/1.0",
+		})
+		with urllib.request.urlopen(request, timeout=15) as response:
+			comparison = json.load(response)
+		ahead = int(comparison["behind_by"])
+		behind = int(comparison["ahead_by"])
+		security_marked = sum(
+			1 for commit in comparison.get("commits", [])
+			if re.search(
+				r"\b(security|cve|vulnerability)\b",
+				commit.get("commit", {}).get("message", "").split("\n", 1)[0], re.I))
+		return (ahead, behind, security_marked), None
+	except (OSError, subprocess.SubprocessError, ValueError, KeyError) as exc:
+		return None, str(exc)
+
+
 def _version_badge(env, manifest=None):
 	"""Returneaza (kind, text, extra) pentru linia de versiune fork-aware."""
 	ov = (manifest or {}).get("overlay_version") or "?"
@@ -60,21 +103,30 @@ def _version_badge(env, manifest=None):
 	m = re.match(r"geseidl[-_](v[0-9][0-9.]*)", this_ver or "", re.I)
 	base = m.group(1) if m else None
 	logo = [{"text": f"◈ Mail-in-a-Box {EDITION} v{ov} — overlay activ", "monospace": True}]
-
-	if base and latest and base == latest:
+	commit_gap, gap_error = _upstream_commit_gap(manifest)
+	if commit_gap is not None:
+		ahead, behind, security_marked = commit_gap
+		release_tag = base or latest or "nedeterminat"
+		if behind:
+			security_note = (
+				f", inclusiv {security_marked} marcat explicit ca securitate"
+				if security_marked else "")
+			extra = list(logo) + [
+				{"text": f"baza tag: {release_tag}; fork: +{ahead} / upstream: -{behind} commituri", "monospace": True},
+				{"text": f"upstream: {security_marked} commituri marcate securitate", "monospace": True},
+			]
+			return ("error",
+				f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); {behind} commituri upstream/main nu sunt integrate{security_note}. Este necesară evaluarea și cherry-pick-ul selectiv.",
+				extra)
 		return ("ok",
-			f"{EDITION}: la zi, aliniat cu upstream {latest}. (rulezi {this_ver})",
+			f"{EDITION}: rulezi {this_ver or 'versiune nedeterminată'} (baza tag {release_tag}); upstream/main este complet integrat, iar forkul are {ahead} commituri Geseidl proprii.",
 			logo)
-	if base and latest and base != latest:
-		# Fork controlat de noi: ramane VERDE; upstream nou = info, nu eroare.
-		note = list(logo) + [{"text": f"↑ upstream {latest} disponibil — rebase optional", "monospace": True}]
-		return ("ok",
-			f"{EDITION}: rulezi {this_ver} (bazat pe upstream {base}).",
-			note)
-	if this_ver:
-		return ("ok", f"{EDITION}: rulezi {this_ver}." + (f" Upstream: {latest}." if latest else ""), logo)
-	return ("ok", f"{EDITION}: overlay activ.", logo)
 
+	# Nu pretindem ca forkul este la zi cand nu putem verifica ramura upstream.
+	check_error = gap_error or "stare upstream indisponibilă"
+	return ("warning",
+		f"{EDITION}: nu s-a putut verifica diferența față de upstream/main ({check_error}).",
+		logo)
 
 # ---- re-verificare per item ----------------------------------------------
 
