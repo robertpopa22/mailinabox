@@ -38,7 +38,7 @@ c=context();c.pre_result=true;check(c,'pre_result_or_reject')
 c=context();c.symbols.DMARC_POLICY_REJECT=0;check(c,'dmarc_conflict')
 -- Shadow must not modify BAYES_SPAM, enforce only adjusts its absolute score.
 local callback,dependencies,adjustments=nil,{},0
-local cfg={register_symbol=function(_,spec) callback=spec.callback;return 1 end,
+local cfg={register_symbol=function(_,spec) assert(spec.flags=='nostat');callback=spec.callback;return 1 end,
  register_dependency=function(_,target,dependency) dependencies[target]=dependency end}
 local task={insert_result=function() end,adjust_result=function(_,symbol,score)
  assert(symbol=='BAYES_SPAM' and score==1);adjustments=adjustments+1 end}

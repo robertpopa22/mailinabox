@@ -132,7 +132,7 @@ function M.register(cfg,options)
   assert(type(options.context)=='function','validated task context adapter required')
   assert(type(options.lookup)=='function','atomic hash-map lookup required')
   local name='ACTIVE_CLIENT_BAYES_CANDIDATE'
-  local id=cfg:register_symbol({name=name,type='postfilter',priority=20,score=0,
+  local id=cfg:register_symbol({name=name,type='postfilter',priority=20,score=0,flags='nostat',
     callback=function(task)
       local ok,result=pcall(function()
         local context=options.context(task)
