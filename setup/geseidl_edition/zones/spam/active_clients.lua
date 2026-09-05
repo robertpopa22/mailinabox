@@ -40,11 +40,13 @@ function M.decision(c, lookup, now)
       expires<=observed or expires-observed>3600 or observed>now or now>=expires then return blocked('stale') end
   if c.authenticated ~= false or c.local_outbound ~= false then return blocked('outbound_or_unknown') end
   if c.header_from_count~=1 or type(c.from)~='table' or #c.from~=1 then return blocked('ambiguous_from') end
-  local sender,sd=email(c.from[1]); local smtp=email(c.smtp_from)
+  local sender,sd=email(c.from[1]); local smtp,smtp_domain=email(c.smtp_from)
   if not sender or not smtp then return blocked('invalid_sender') end
   if tostring(lookup('domain:'..sd))=='1' then return blocked('local_sender') end
   local senderhex=sender:gsub('.',function(ch) return string.format('%02x',string.byte(ch)) end)
-  if tostring(lookup('senderhex:'..senderhex))~='1' then return blocked('unknown_sender') end
+  local exact=tostring(lookup('senderhex:'..senderhex))=='1'
+  local client_domain=tostring(lookup('clientdomain:'..sd))=='1'
+  if not exact and not client_domain then return blocked('unknown_sender') end
   if type(c.recipients)~='table' or #c.recipients==0 then return blocked('missing_recipients') end
   for _,r in ipairs(c.recipients) do
     local address,rd=email(r)
@@ -53,11 +55,29 @@ function M.decision(c, lookup, now)
   if c.bulk~=false or c.list~=false or c.bounce~=false or
       (c.auto_submitted~=nil and (type(c.auto_submitted)~='string' or c.auto_submitted:lower()~='no')) then return blocked('automated_or_unknown') end
   local symbols=c.symbols
-  if type(symbols)~='table' or not present(symbols,'DMARC_POLICY_ALLOW') then return blocked('dmarc_unverified') end
+  if type(symbols)~='table' then return blocked('dmarc_unverified') end
+  local dmarc_allow=present(symbols,'DMARC_POLICY_ALLOW')
+  local aligned_dkim=false
+  -- DKIM_TRACE comes from the verifier, never from message headers. Permit the
+  -- no-policy case only with strict (exact domain) DKIM alignment.
+  if not dmarc_allow and present(symbols,'DMARC_NA') and present(symbols,'R_DKIM_ALLOW') and type(c.dkim_verified_domains)=='table' then
+    for _,signer in ipairs(c.dkim_verified_domains) do
+      if domain(signer)==sd then aligned_dkim=true end
+    end
+  end
+  local aligned_spf=not dmarc_allow and present(symbols,'DMARC_NA') and
+    present(symbols,'R_SPF_ALLOW') and smtp_domain==sd
+  if aligned_spf then
+    for _,conflict in ipairs({'R_SPF_FAIL','R_SPF_SOFTFAIL','R_SPF_DNSFAIL','R_SPF_PERMFAIL','R_SPF_NA','R_SPF_NEUTRAL'}) do
+      if present(symbols,conflict) then aligned_spf=false end
+    end
+  end
+  local aligned_auth=aligned_dkim or aligned_spf
+  if not dmarc_allow and not aligned_auth then return blocked('dmarc_unverified') end
   for name,value in pairs(symbols) do
     if value~=false then
       local upper=name:upper()
-      if upper:match('^DMARC') and (upper:find('NA',1,true) or upper:find('REJECT',1,true) or upper:find('QUARANTINE',1,true) or upper:find('SOFTFAIL',1,true) or upper:find('DNSFAIL',1,true)) then return blocked('dmarc_conflict') end
+      if upper:match('^DMARC') and not (upper=='DMARC_NA' and aligned_auth) and (upper:find('NA',1,true) or upper:find('REJECT',1,true) or upper:find('QUARANTINE',1,true) or upper:find('SOFTFAIL',1,true) or upper:find('DNSFAIL',1,true)) then return blocked('dmarc_conflict') end
       local configured=c.security_symbols or M.security_symbols
       if configured[name] or upper:find('PHISH',1,true) or upper:find('VIRUS',1,true) or upper:find('MALWARE',1,true) or upper:find('FUZZY_DENIED',1,true) or upper:find('BLACKLIST',1,true) then return blocked('security') end
     end
@@ -65,8 +85,9 @@ function M.decision(c, lookup, now)
   local total,threshold=number(c.total),number(c.reject_threshold)
   if c.pre_result~=false or not total or not threshold or total>=threshold then return blocked('pre_result_or_reject') end
   local bayes=number(symbols.BAYES_SPAM)
-  if not bayes or bayes<=1 then return {eligible=true,apply=false,reason='eligible'} end
-  return {eligible=true,apply=true,reason='cap_would_apply',original_bayes=bayes,cap=1.0,delta=bayes-1,proposed_total=total-(bayes-1)}
+  local match_type=exact and 'exact' or 'client_domain'
+  if not bayes or bayes<=1 then return {eligible=true,apply=false,reason='eligible',match_type=match_type} end
+  return {eligible=true,apply=true,reason='cap_would_apply',match_type=match_type,original_bayes=bayes,cap=1.0,delta=bayes-1,proposed_total=total-(bayes-1)}
 end
 
 function M.context_from_task(task)
@@ -84,12 +105,23 @@ function M.context_from_task(task)
     local smtp=addresses(task:get_from('smtp'))
     local recipients=addresses(task:get_recipients('smtp'))
     local symbols={}
+    local dkim_verified_domains={}
     local all=task:get_symbols_all()
     assert(type(all)=='table')
     for _,symbol in ipairs(all) do
       assert(type(symbol.name)=='string' and number(symbol.score))
       assert(symbols[symbol.name]==nil)
       symbols[symbol.name]=symbol.score
+      if symbol.name=='DKIM_TRACE' then
+        assert(type(symbol.options)=='table')
+        for _,option in ipairs(symbol.options) do
+          assert(type(option)=='string')
+          local signer=option:match('^([^:]+):%+$')
+          if signer and domain(signer:lower()) then
+            dkim_verified_domains[#dkim_verified_domains+1]=signer:lower()
+          end
+        end
+      end
     end
     local function has(name)
       local value=task:has_symbol(name)
@@ -119,7 +151,7 @@ function M.context_from_task(task)
         precedence=='bulk' or precedence=='list' or precedence=='junk',
       list=has('MAILLIST') or header('List-Id')~=nil or header('List-Unsubscribe')~=nil,
       bounce=has('BOUNCE') or #smtp~=1 or not email(smtp[1]),auto_submitted=header('Auto-Submitted'),
-      symbols=symbols,total=score[1],reject_threshold=threshold,pre_result=pre_result}
+      symbols=symbols,dkim_verified_domains=dkim_verified_domains,total=score[1],reject_threshold=threshold,pre_result=pre_result}
   end)
   if not ok then error('active-client context adapter failed',0) end
   return context
@@ -142,7 +174,7 @@ function M.register(cfg,options)
       if not ok then task:insert_result(name,0,'blocked_adapter_error'); return end
       if result.apply then
         if options.mode=='enforce' then task:adjust_result('BAYES_SPAM',result.cap) end
-        task:insert_result(name,0,string.format('%s;bayes=%g;cap=%g',options.mode=='enforce' and 'cap_applied' or 'cap_would_apply',result.original_bayes,result.cap))
+        task:insert_result(name,0,string.format('%s;match=%s;bayes=%g;cap=%g',options.mode=='enforce' and 'cap_applied' or 'cap_would_apply',result.match_type,result.original_bayes,result.cap))
       elseif result.eligible or result.reason=='stale' then
         task:insert_result(name,0,result.eligible and 'eligible' or 'blocked_stale')
       end

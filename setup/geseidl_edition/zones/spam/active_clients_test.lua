@@ -1,4 +1,4 @@
-local source=arg[0]:match('^(.*[/\\])') or ''
+local source=debug.getinfo(1,'S').source:sub(2):match('^(.*[/\\])') or ''
 local m=dofile(source..'active_clients.lua')
 local function senderkey(s) return 'senderhex:'..s:gsub('.',function(ch) return string.format('%02x',string.byte(ch)) end) end
 local map={__schema='1',__observed='1000',__expires='1600',
@@ -24,7 +24,39 @@ map[senderkey('alice+#tag@example.org')]='1';assert(m.decision(hashed,lookup,120
 -- Shared active relationships are already resolved by the map producer.
 assert(m.decision(context(),lookup,1200).apply)
 local c=context();c.from={'alice@example.org'};check(c,'unknown_sender')
+map['clientdomain:example.org']='1'
+local by_domain=m.decision(c,lookup,1200)
+assert(by_domain.apply and by_domain.match_type=='client_domain')
+map['clientdomain:example.org']=nil
 c=context();c.symbols.DMARC_POLICY_ALLOW=nil;check(c,'dmarc_unverified')
+local function dkim_context(signer)
+ local value=context()
+ value.symbols.DMARC_POLICY_ALLOW=nil
+ value.symbols.DMARC_NA=0
+ value.symbols.R_DKIM_ALLOW=-0.2
+ value.dkim_verified_domains={signer}
+ return value
+end
+assert(m.decision(dkim_context('example.org'),lookup,1200).apply)
+check(dkim_context('attacker.example'),'dmarc_unverified')
+check(dkim_context('example.org.attacker.example'),'dmarc_unverified')
+check(dkim_context('child.example.org'),'dmarc_unverified')
+c=dkim_context('example.org');c.symbols.DMARC_DNSFAIL=0;check(c,'dmarc_conflict')
+c=dkim_context('example.org');c.symbols.DMARC_POLICY_REJECT=0;check(c,'dmarc_conflict')
+c=dkim_context('example.org');c.symbols.CLAM_VIRUS=0;check(c,'security')
+c=dkim_context('example.org');c.symbols.DMARC_NA=nil;check(c,'dmarc_unverified')
+local function spf_context()
+ local value=dkim_context('tenant.onmicrosoft.com')
+ value.symbols.R_SPF_ALLOW=-0.2
+ return value
+end
+assert(m.decision(spf_context(),lookup,1200).apply)
+c=spf_context();c.smtp_from='sender@attacker.example';check(c,'dmarc_unverified')
+c=spf_context();c.smtp_from='sender@example.org.attacker.example';check(c,'dmarc_unverified')
+c=spf_context();c.smtp_from='';check(c,'invalid_sender')
+c=spf_context();c.symbols.R_SPF_DNSFAIL=0;check(c,'dmarc_unverified')
+c=spf_context();c.symbols.DMARC_POLICY_REJECT=0;check(c,'dmarc_conflict')
+c=spf_context();c.symbols.CLAM_VIRUS=0;check(c,'security')
 c=context();c.header_from_count=2;check(c,'ambiguous_from')
 c=context();c.from={'desk@internal.example'};check(c,'local_sender')
 c=context();c.authenticated=true;check(c,'outbound_or_unknown')
@@ -60,6 +92,17 @@ local actual=m.context_from_task(mock)
 assert(actual.from[1]=='Alice+Tag@example.org' and actual.smtp_from=='bounce@example.org')
 assert(actual.authenticated==false and actual.local_outbound==false and not actual.bulk and not actual.list)
 assert(m.decision(actual,lookup,1200).apply)
+local original_symbols=mock.get_symbols_all
+mock.get_symbols_all=function() return {
+ {name='DMARC_NA',score=0},{name='R_DKIM_ALLOW',score=-0.2},
+ {name='DKIM_TRACE',score=0,options={'attacker.example:+','example.org:-','EXAMPLE.ORG:+'}},
+ {name='BAYES_SPAM',score=6.5}} end
+assert(m.decision(m.context_from_task(mock),lookup,1200).apply)
+mock.get_symbols_all=function() return {
+ {name='DMARC_NA',score=0},{name='R_DKIM_ALLOW',score=-0.2},
+ {name='DKIM_TRACE',score=0,options={'attacker.example:+','example.org:-','example.org:?'}}} end
+check(m.context_from_task(mock),'dmarc_unverified')
+mock.get_symbols_all=original_symbols
 cfg.add_map=function(_,spec)
  assert(spec.type=='hash' and spec.url=='/synthetic/active.map')
  return {get_key=function(_,key) return lookup(key) end}
