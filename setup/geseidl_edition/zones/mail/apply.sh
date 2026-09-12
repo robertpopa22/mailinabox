@@ -219,11 +219,49 @@ apply_dmarc_alerts() {
 	log "monitor DMARC instalat; timer 15 minute, notificare doar la probleme."
 }
 
+# --- 7) fail2ban: filtru Dovecot corectat + praguri Geseidl (2026-09-13) ------
+# Filtrul upstream `dovecotimap` nu matcheaza formatul Dovecot 2.3.21
+# (`Disconnected: Connection closed (auth failed`) -> jail orb. Sursa filtrului
+# corectat = conf/fail2ban/filter.d/dovecotimap.conf (instalat si de setup/system.sh);
+# pragurile = fail2ban-zz-geseidl.conf din aceasta zona -> jail.d/zz-geseidl.conf
+# (fisier separat de mailinabox.conf, care e regenerat la fiecare setup).
+apply_fail2ban_geseidl() {
+	local REPO_ROOT FILTER_SRC FILTER_DST JAIL_SRC JAIL_DST changed=0
+	REPO_ROOT="$(cd "$ZONE_DIR/../../../.." && pwd)"
+	FILTER_SRC="$REPO_ROOT/conf/fail2ban/filter.d/dovecotimap.conf"
+	FILTER_DST=/etc/fail2ban/filter.d/dovecotimap.conf
+	JAIL_SRC="$ZONE_DIR/fail2ban-zz-geseidl.conf"
+	JAIL_DST=/etc/fail2ban/jail.d/zz-geseidl.conf
+	for pair in "$FILTER_SRC:$FILTER_DST" "$JAIL_SRC:$JAIL_DST"; do
+		local src="${pair%%:*}" dst="${pair##*:}"
+		[ -f "$src" ] || { log "EROARE: lipseste $src"; return 1; }
+		if ! cmp -s "$src" "$dst"; then
+			install -m 0644 "$src" "$dst"
+			changed=1
+		fi
+	done
+	if [ "$changed" = 0 ]; then
+		log "fail2ban (filtru dovecotimap + praguri Geseidl) deja aplicat. skip."
+		return 0
+	fi
+	# Gard: nu incarcam o configuratie care nu trece testul de sintaxa.
+	if ! fail2ban-client -t >/dev/null 2>&1; then
+		log "EROARE: fail2ban-client -t a esuat; configuratia NU a fost reincarcata."
+		return 1
+	fi
+	fail2ban-client reload >/dev/null 2>&1 || systemctl restart fail2ban
+	log "fail2ban reincarcat: filtru dovecotimap corectat + jail.d/zz-geseidl.conf."
+}
+
 apply_archive_bcc
 apply_imap_allow_nets
 apply_sieve_no_redirect
 apply_auth_policy
 apply_webmail_real_ip
+apply_fail2ban_geseidl || {
+	log "EROARE: configurarea fail2ban a esuat; zona mail este incompleta."
+	exit 1
+}
 apply_dmarc_alerts || {
 	log "EROARE: instalarea monitorului DMARC a esuat; zona mail este incompleta."
 	exit 1
