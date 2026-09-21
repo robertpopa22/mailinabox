@@ -111,6 +111,57 @@ HOOKS = [
 		"indent": "\t",
 	},
 	{
+		"name": "status_checks:ssh-config-unknown",
+		"file": "status_checks.py",
+		"mode": "after",
+		"anchor": "\tservices = get_services(env)",
+		"signature": "SSH configuration could not be read (sshd -T)",
+		"block": (
+			"\tif any(service[\"name\"] == \"SSH Login (ssh)\" and service[\"port\"] is None for service in services):\n"
+			"\t\toutput.print_warning(\"SSH configuration could not be read (sshd -T); SSH port and firewall status are unknown.\")\n"
+			"\t\tall_running = False\n"
+		),
+		"indent": "\t",
+	},
+	{
+		"name": "status_checks:firewall-skip-unknown-port",
+		"file": "status_checks.py",
+		"mode": "replace",
+		"anchor": "\t\t\tif service[\"public\"] and not is_port_allowed(ufw, service[\"port\"]):",
+		"signature": "service[\"public\"] and service[\"port\"] is not None and not is_port_allowed",
+		"block": (
+			"\t\t\tif service[\"public\"] and service[\"port\"] is not None and not is_port_allowed(ufw, service[\"port\"]):\n"
+		),
+		"indent": "\t\t\t",
+	},
+	{
+		"name": "status_checks:semantic-diff",
+		"file": "status_checks.py",
+		"mode": "after",
+		"anchor": "\t\t# category by category.",
+		"signature": "from geseidl_edition.status_changes import semantic_line_key",
+		"block": (
+			"\t\ttry:\n"
+			"\t\t\tfrom geseidl_edition.status_changes import semantic_line_key\n"
+			"\t\texcept Exception:\n"
+			"\t\t\tsemantic_line_key = None\n"
+		),
+		"indent": "\t\t",
+	},
+	{
+		"name": "status_checks:semantic-diff-key",
+		"file": "status_checks.py",
+		"mode": "replace",
+		"anchor": "\t\t\t\t\treturn [json.dumps(line) for line in lines]",
+		"signature": "return [semantic_line_key(line) for line in lines]",
+		"block": (
+			"\t\t\t\t\tif semantic_line_key:\n"
+			"\t\t\t\t\t\treturn [semantic_line_key(line) for line in lines]\n"
+			"\t\t\t\t\treturn [json.dumps(line) for line in lines]\n"
+		),
+		"indent": "\t\t\t\t\t",
+	},
+	{
 		"name": "status_checks:console",
 		"file": "status_checks.py",
 		"mode": "replace",

@@ -81,7 +81,11 @@ def run_services_checks(env, output, pool):
 	# Check that system services are running.
 	all_running = True
 	fatal = False
-	ret = pool.starmap(check_service, ((i, service, env) for i, service in enumerate(get_services(env))), chunksize=1)
+	services = get_services(env)
+	if any(service["name"] == "SSH Login (ssh)" and service["port"] is None for service in services):
+		output.print_warning("SSH configuration could not be read (sshd -T); SSH port and firewall status are unknown.")
+		all_running = False
+	ret = pool.starmap(check_service, ((i, service, env) for i, service in enumerate(services)), chunksize=1)
 	for _i, running, fatal2, output2 in sorted(ret):
 		if output2 is None: continue # skip check (e.g. no port was set, e.g. no sshd)
 		all_running = all_running and running
@@ -196,7 +200,7 @@ def check_ufw(env, output):
 	if ufw[0] == "Status: active":
 		not_allowed_ports = 0
 		for service in get_services():
-			if service["public"] and not is_port_allowed(ufw, service["port"]):
+			if service["public"] and service["port"] is not None and not is_port_allowed(ufw, service["port"]):
 				not_allowed_ports += 1
 				output.print_error("Port {} ({}) should be allowed in the firewall, please re-run the setup.".format(service["port"], service["name"]))
 
@@ -1073,6 +1077,12 @@ def run_and_output_changes(env, pool):
 
 		# Compare the previous to the current status checks
 		# category by category.
+		# >>> GESEIDL EDITION OVERLAY >>>
+		try:
+			from geseidl_edition.status_changes import semantic_line_key
+		except Exception:
+			semantic_line_key = None
+		# <<< GESEIDL EDITION OVERLAY <<<
 		for category, cur_lines in cur_status.items():
 			if category not in prev_status:
 				out.add_heading(category + " -- Added")
@@ -1081,6 +1091,8 @@ def run_and_output_changes(env, pool):
 				# Actual comparison starts here...
 				prev_lines = prev_status[category]
 				def stringify(lines):
+					if semantic_line_key:
+						return [semantic_line_key(line) for line in lines]
 					return [json.dumps(line) for line in lines]
 				diff = SequenceMatcher(None, stringify(prev_lines), stringify(cur_lines)).get_opcodes()
 				for op, i1, i2, j1, j2 in diff:
