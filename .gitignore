@@ -8,3 +8,8 @@ externals/
 api/docs/api-docs.html
 *.code-workspace
 backup/
+
+# Local build artefacts that must never reach this public fork
+__pycache__/
+*.pyc
+uv.lock
