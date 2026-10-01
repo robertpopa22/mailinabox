@@ -478,7 +478,7 @@ model = "geseidl-qwen3.8:approved-20260816";
 model_parameters {
   "geseidl-qwen3.8:approved-20260816" {
     think = false;
-    keep_alive = "30m";
+    keep_alive = -1; # shared Qwen stays resident; do not override the server with a 30m expiry
     options {
       temperature = 0;
       num_ctx = 32768;
