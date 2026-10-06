@@ -51,7 +51,7 @@ def _upstream_commit_gap(manifest):
 	"""Return graph gap and the current upstream commits against canonical upstream.
 
 	The GitHub comparison API compares this exact local commit with upstream's
-	`main`. It avoids mutating refs and works on MAIL02, where Git protocol v2
+	`main`. It avoids mutating refs and works on the production server, where Git protocol v2
 	fetches can fail even though HTTPS access to GitHub is available.
 	"""
 	marker = (manifest or {}).get("path")
@@ -312,11 +312,11 @@ def process_sections(sections, env, pool, manifest):
 					break
 			if not replaced:
 				section["items"].append(mk(kind, text, extra))
-			# Backup: gestionat extern (GES-BACKUP), nu prin MiaB
+			# Backup: gestionat extern, nu prin MiaB
 			for item in section["items"]:
 				if item["kind"] == "warning" and "Backups are disabled" in item["text"]:
 					item["kind"] = "ok"
-					item["text"] = f"Backup gestionat extern (GES-BACKUP), nu prin MiaB. [{EDITION}]"
+					item["text"] = f"Backup gestionat extern, nu prin MiaB. [{EDITION}]"
 			# Disc: prag adaptat la disc mare (warning la 10% liber, nu 15-30% upstream)
 			for item in section["items"]:
 				if "space remaining" in item["text"] or "free space" in item["text"]:

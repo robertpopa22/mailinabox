@@ -12,13 +12,15 @@ The table and the password_query patch are provisioned by the mail zone:
 
 Usage:
     python3 imap_restrict.py list
-    python3 imap_restrict.py add <email> [--nets "10.0.1.0/24 192.168.2.0/24 ..."]
+    python3 imap_restrict.py add <email> [--nets "192.0.2.0/24 198.51.100.0/24 ..."]
     python3 imap_restrict.py remove <email>
 
 Notes:
 - `add` is INSERT-or-UPDATE (idempotent).
-- Default nets (LAN + WG ZTNA POWER + Tailscale) intentionally EXCLUDE
-  127.0.0.1 -> blocks public-facing Roundcube webmail for these accounts.
+- Allowed nets come from --nets or, if omitted, from the MIAB_IMAP_DEFAULT_NETS
+  environment variable (space-separated CIDRs); with neither, `add` refuses to run
+  (fail closed). Nets intentionally EXCLUDE 127.0.0.1 -> blocks public-facing
+  Roundcube webmail for these accounts.
 - Changes take effect immediately (Dovecot reads the table per auth); no reload
   needed for table edits, only for the one-time query patch in apply.sh.
 """
@@ -33,8 +35,9 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-# LAN intern + WG ZTNA POWER + Tailscale. 127.0.0.1 EXCLUS (blocheaza webmail).
-DEFAULT_NETS = "10.0.1.0/24 192.168.2.0/24 100.64.0.0/10"
+# Default allow-list comes from the deployment environment (never hardcoded here).
+# 127.0.0.1 is deliberately NOT part of it (would let public webmail through).
+DEFAULT_NETS = os.environ.get("MIAB_IMAP_DEFAULT_NETS", "").strip()
 
 STORAGE_ROOT = os.environ.get("STORAGE_ROOT", "/home/user-data")
 DB_PATH = os.path.join(STORAGE_ROOT, "mail", "users.sqlite")
@@ -94,6 +97,9 @@ def cmd_add(args):
     if not _user_exists(conn, email):
         sys.exit(f"EROARE: contul '{email}' nu exista in tabela users. "
                  f"Creeaza-l intai in MiaB Admin.")
+    if not args.nets:
+        sys.exit("EROARE: nicio retea data. Foloseste --nets \"<CIDR ...>\" sau seteaza "
+                 "MIAB_IMAP_DEFAULT_NETS in mediu.")
     nets = _validate_nets(args.nets)
     conn.execute(
         "INSERT INTO geseidl_imap_restrictions (email, allow_nets) VALUES (?, ?) "
@@ -130,7 +136,7 @@ def main():
     pa = sub.add_parser("add", help="restrictioneaza un cont (INSERT/UPDATE)")
     pa.add_argument("email")
     pa.add_argument("--nets", default=DEFAULT_NETS,
-                    help=f"retele permise, separate prin spatiu (default: '{DEFAULT_NETS}')")
+                    help="retele permise, separate prin spatiu (default: $MIAB_IMAP_DEFAULT_NETS)")
     pa.set_defaults(func=cmd_add)
 
     pr = sub.add_parser("remove", help="elimina restrictia unui cont")

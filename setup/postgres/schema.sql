@@ -1,5 +1,5 @@
--- Email index schema for MAIL02 PostgreSQL
--- Source of truth for both 'live' (MAIL02 maildir) and 'archive' (GES051WS Thunderbird) indexers.
+-- Email index schema for the mail server PostgreSQL
+-- Source of truth for both 'live' (server maildir) and 'archive' (workstation Thunderbird) indexers.
 -- FTS via tsvector STORED generated column + GIN index, with unaccent extension to mimic
 -- SQLite FTS5 'unicode61 remove_diacritics 2' behavior (existing queries stay compatible).
 

@@ -35,7 +35,7 @@ class DmarcAlertsTest(unittest.TestCase):
 
 	def test_unexpected_source_ip_is_actionable_even_when_dmarc_passes(self):
 		report = MODULE.parse_report_xml(MODULE._sample_xml(dkim="pass", spf="pass"))
-		self.assertEqual(report.get_problem_codes({"81.196.135.66"}), ("unexpected_source_ip",))
+		self.assertEqual(report.get_problem_codes({"192.0.2.99"}), ("unexpected_source_ip",))
 
 	def test_retransmitted_report_is_archived_without_another_alert(self):
 		report = MODULE.parse_report_xml(MODULE._sample_xml(dkim="fail", spf="fail", disposition="reject"))
@@ -47,10 +47,10 @@ class DmarcAlertsTest(unittest.TestCase):
 				with patch.object(MODULE, "submit_alert") as submit, patch.object(MODULE, "move_message") as move:
 					summary = MODULE.process_scan(
 						scan,
-						"gesit-alerte@geseidl.ro",
+						"dmarc-reports@example.com",
 						connection,
-						"gesit-alerte@geseidl.ro",
-						"dit@geseidl.ro",
+						"dmarc-reports@example.com",
+						"postmaster@example.com",
 						{"192.0.2.10"},
 						False,
 					)
@@ -58,7 +58,7 @@ class DmarcAlertsTest(unittest.TestCase):
 				connection.close()
 		self.assertFalse(summary["alert_sent"])
 		submit.assert_not_called()
-		move.assert_called_once_with("gesit-alerte@geseidl.ro", "42", "Archive")
+		move.assert_called_once_with("dmarc-reports@example.com", "42", "Archive")
 
 	def test_namespace_and_zip_message_are_supported(self):
 		xml = MODULE._sample_xml(dkim="pass", spf="pass").replace(b"<feedback>", b'<feedback xmlns="urn:ietf:params:xml:ns:dmarc-2.0">')
@@ -66,11 +66,11 @@ class DmarcAlertsTest(unittest.TestCase):
 		with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
 			archive.writestr("report.xml", xml)
 		message = EmailMessage()
-		message["Subject"] = "Report domain: geseidl.ro"
+		message["Subject"] = "Report domain: example.com"
 		message.set_content("aggregate report")
 		message.add_attachment(buffer.getvalue(), maintype="application", subtype="zip", filename="report.zip")
-		report = MODULE.parse_message(message.as_bytes(), {"geseidl.ro"})
-		self.assertEqual(report.policy_domain, "geseidl.ro")
+		report = MODULE.parse_message(message.as_bytes(), {"example.com"})
+		self.assertEqual(report.policy_domain, "example.com")
 
 	def test_doctype_is_rejected(self):
 		xml = MODULE._sample_xml(dkim="pass", spf="pass").replace(b"<feedback>", b"<!DOCTYPE feedback><feedback>")
@@ -82,13 +82,13 @@ class DmarcAlertsTest(unittest.TestCase):
 		message = EmailMessage()
 		message.add_attachment(xml, maintype="application", subtype="xml", filename="report.xml")
 		with self.assertRaises(MODULE.ReportError):
-			MODULE.parse_message(message.as_bytes(), {"geseidl.ro"})
+			MODULE.parse_message(message.as_bytes(), {"example.com"})
 
 	def test_alert_is_multipart_and_metadata_only(self):
 		report = MODULE.parse_report_xml(MODULE._sample_xml(dkim="fail", spf="fail", disposition="reject"))
-		message = MODULE.build_alert_message([report], "gesit-alerte@geseidl.ro", "dit@geseidl.ro", {"192.0.2.10"})
+		message = MODULE.build_alert_message([report], "dmarc-reports@example.com", "postmaster@example.com", {"192.0.2.10"})
 		self.assertTrue(message.is_multipart())
-		self.assertEqual(message["To"], "dit@geseidl.ro")
+		self.assertEqual(message["To"], "postmaster@example.com")
 		self.assertEqual(message["X-Geseidl-Status"], "WARNING")
 		self.assertIn("dmarc_alignment_failed", message.get_body(preferencelist=("plain",)).get_content())
 		self.assertNotIn("http://", message.get_body(preferencelist=("html",)).get_content())

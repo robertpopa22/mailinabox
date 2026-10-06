@@ -319,13 +319,13 @@ def cmd_selftest():
 		warn("Backups are disabled. It is recommended to enable a backup for your box."),
 		head("Network"),
 		warn("Mail-in-a-Box is configured to use a public DNS server. This is not supported by spamhaus. Could not determine whether this box's IPv4 address is blacklisted."),
-		head("geseidl.ro"),
-		warn("Mail-in-a-Box is configured to use a public DNS server. This is not supported by spamhaus. Could not determine whether the domain geseidl.ro is blacklisted."),
+		head("example.com"),
+		warn("Mail-in-a-Box is configured to use a public DNS server. This is not supported by spamhaus. Could not determine whether the domain example.com is blacklisted."),
 		err("The nameservers set on this domain are incorrect. They are currently tim.ns.cloudflare.com; tina.ns.cloudflare.com."),
-		err("This domain should resolve to this box's IP address (A 81.196.135.66) ... currently resolves to 104.26.3.65."),
+		err("This domain should resolve to this box's IP address (A 203.0.113.10) ... currently resolves to 104.26.3.65."),
 		err("MTA-STS policy is missing: STSFetchResult.NONE"),
 	]
-	env = {"PRIMARY_HOSTNAME": "mail.geseidl.ro", "PUBLIC_IP": "81.196.135.66"}
+	env = {"PRIMARY_HOSTNAME": "mail.example.com", "PUBLIC_IP": "203.0.113.10"}
 	out = FakeWeb(list(items))
 	engine.apply_overlay(out, env)
 	print("=== DUPA OVERLAY ===")

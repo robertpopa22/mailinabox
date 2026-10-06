@@ -159,7 +159,7 @@ EOF
 # IMAP ID (plugin dovecot_ident, instalat de setup/webmail.sh). Astfel
 # allow_nets / auth policy / logging se aplica pe vizitatorul REAL, nu pe
 # 127.0.0.1 — conturile restrictionate au webmail DOAR din retele interne,
-# conturile nerestrictionate (ex. clienti biamco.ro) si din exterior.
+# conturile nerestrictionate (ex. domenii de clienti gazduite) si din exterior.
 apply_webmail_real_ip() {
 	local CONF=/etc/dovecot/conf.d/99-zz-geseidl-trusted.conf
 	local WANT='# Geseidl Edition: Roundcube (localhost) forwardeaza IP-ul real prin IMAP ID.
@@ -187,8 +187,9 @@ login_trusted_networks = 127.0.0.1 ::1'
 }
 
 # --- 6) Monitor rapoarte agregate DMARC (2026-08-31) -------------------------
-# Rapoartele rua ajung in mailboxul tehnic gesit-alerte@. Serviciul local
-# arhiveaza rapoartele sanatoase si notifica dit@ numai pentru DMARC fail,
+# Rapoartele rua ajung intr-un mailbox tehnic dedicat (DMARC_ALERTS_MAILBOX, din
+# /etc/geseidl-dmarc-alerts.env). Serviciul local arhiveaza rapoartele sanatoase
+# si notifica operatorul (DMARC_ALERTS_NOTIFY) numai pentru DMARC fail,
 # disposition reject/quarantine, policy drift sau erori declarate in raport.
 apply_dmarc_alerts() {
 	local SCRIPT_SRC="$ZONE_DIR/dmarc_alerts.py"
@@ -200,8 +201,16 @@ apply_dmarc_alerts() {
 		log "EROARE: sursa monitorului DMARC lipseste ($SCRIPT_SRC)."
 		return 1
 	fi
-	if ! sqlite3 "$USERS_DB" "SELECT 1 FROM users WHERE email='gesit-alerte@geseidl.ro' LIMIT 1;" | grep -qx 1; then
-		log "EROARE: mailboxul gesit-alerte@geseidl.ro nu exista; monitorul ramane neinstalat."
+	local ENVF=/etc/geseidl-dmarc-alerts.env DMARC_ALERTS_MAILBOX=""
+	if [ -f "$ENVF" ]; then
+		DMARC_ALERTS_MAILBOX="$(sed -n 's/^DMARC_ALERTS_MAILBOX=//p' "$ENVF" | head -1)"
+	fi
+	if [ -z "$DMARC_ALERTS_MAILBOX" ]; then
+		log "monitor DMARC: $ENVF lipseste sau nu defineste DMARC_ALERTS_MAILBOX; zona sarita."
+		return 0
+	fi
+	if ! sqlite3 "$USERS_DB" "SELECT 1 FROM users WHERE email='$DMARC_ALERTS_MAILBOX' LIMIT 1;" | grep -qx 1; then
+		log "EROARE: mailboxul $DMARC_ALERTS_MAILBOX nu exista; monitorul ramane neinstalat."
 		return 1
 	fi
 
@@ -212,8 +221,8 @@ apply_dmarc_alerts() {
 	install -o root -g root -m 0644 "$ZONE_DIR/$TIMER" "/etc/systemd/system/$TIMER" || return 1
 
 	"$SCRIPT_DST" --self-test >/dev/null || return 1
-	doveadm mailbox create -u gesit-alerte@geseidl.ro Archive 2>/dev/null || true
-	doveadm mailbox create -u gesit-alerte@geseidl.ro Invalid 2>/dev/null || true
+	doveadm mailbox create -u "$DMARC_ALERTS_MAILBOX" Archive 2>/dev/null || true
+	doveadm mailbox create -u "$DMARC_ALERTS_MAILBOX" Invalid 2>/dev/null || true
 	systemctl daemon-reload || return 1
 	systemctl enable --now "$TIMER" >/dev/null || return 1
 	log "monitor DMARC instalat; timer 15 minute, notificare doar la probleme."

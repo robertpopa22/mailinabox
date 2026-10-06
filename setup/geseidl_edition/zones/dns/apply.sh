@@ -94,9 +94,11 @@ sleep 2
 
 # --- 4. verificare + auto-rollback ---
 EXT=$(dig +short +time=4 +tries=2 @127.0.0.1 gmail.com MX | head -1)
-SELF=$(dig +short +time=4 +tries=2 @127.0.0.1 mail.geseidl.ro A | head -1)
+SELF_HOST="$(sed -n 's/^PRIMARY_HOSTNAME=//p' /etc/mailinabox.conf 2>/dev/null | head -1)"
+SELF_HOST="${SELF_HOST:-$(hostname -f)}"
+SELF=$(dig +short +time=4 +tries=2 @127.0.0.1 "$SELF_HOST" A | head -1)
 SPAM=$(dig +short +time=6 +tries=1 @127.0.0.1 2.0.0.127.zen.spamhaus.org A | head -1)
-log "verify: gmail MX='$EXT' | mail.geseidl.ro='$SELF' | spamhaus-test='$SPAM'"
+log "verify: gmail MX='$EXT' | $SELF_HOST='$SELF' | spamhaus-test='$SPAM'"
 
 if [ -z "$EXT" ] || [ -z "$SELF" ]; then
 	log "rezolutie de baza RUPTA dupa flip"

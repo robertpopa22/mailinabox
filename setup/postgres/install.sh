@@ -1,10 +1,10 @@
 #!/bin/bash
-# Install + configure PostgreSQL 16 for the email index on MAIL02.
+# Install + configure PostgreSQL 16 for the email index on the mail server.
 # Idempotent — safe to re-run.
 #
 # Steps:
 #   1. Apply tuned postgresql.conf via include directive.
-#   2. Append pg_hba.conf rules for scram-sha-256 from 10.0.1.0/24.
+#   2. Append pg_hba.conf rules for scram-sha-256 from $LAN_CIDR.
 #   3. UFW allow 5432/tcp from LAN.
 #   4. Create DB 'ges_mail' + extensions + schema + roles with random passwords.
 #   5. Write /etc/mailinabox/postgres.env with DSNs (chmod 600).
@@ -22,6 +22,12 @@ PG_HBA=$PG_CONF_DIR/pg_hba.conf
 TUNED_CONF=$PG_CONF_DIR/conf.d/99-mailinabox-tuned.conf
 
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Deployment values (set in the environment before running):
+#   LAN_CIDR     CIDR allowed to reach PostgreSQL (e.g. 192.0.2.0/24)
+#   PG_LAN_HOST  address clients on that network use to reach this server
+LAN_CIDR="${LAN_CIDR:?set LAN_CIDR to the client network CIDR}"
+PG_LAN_HOST="${PG_LAN_HOST:-127.0.0.1}"
 
 if ! command -v psql >/dev/null; then
     echo "ERROR: psql not installed. Install postgresql-$PG_VERSION first." >&2
@@ -41,10 +47,10 @@ fi
 echo "[+] Configure pg_hba.conf..."
 # Remove any prior mailinabox-managed block, then append fresh
 sed -i '/# BEGIN mailinabox/,/# END mailinabox/d' "$PG_HBA"
-cat >> "$PG_HBA" <<'EOF'
+cat >> "$PG_HBA" <<EOF
 # BEGIN mailinabox — email index access
-host    ges_mail    ges_mail_indexer    10.0.1.0/24    scram-sha-256
-host    ges_mail    ges_mail_reader     10.0.1.0/24    scram-sha-256
+host    ges_mail    ges_mail_indexer    $LAN_CIDR    scram-sha-256
+host    ges_mail    ges_mail_reader     $LAN_CIDR    scram-sha-256
 host    ges_mail    ges_mail_indexer    127.0.0.1/32   scram-sha-256
 host    ges_mail    ges_mail_reader     127.0.0.1/32   scram-sha-256
 # END mailinabox
@@ -52,7 +58,7 @@ EOF
 
 echo "[+] UFW allow 5432 from LAN..."
 if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
-    ufw allow from 10.0.1.0/24 to any port 5432 proto tcp comment 'PostgreSQL email index'
+    ufw allow from "$LAN_CIDR" to any port 5432 proto tcp comment 'PostgreSQL email index'
 fi
 
 echo "[+] Restart PostgreSQL..."
@@ -124,9 +130,9 @@ EMAIL_INDEXER_PW=$EMAIL_INDEXER_PW
 EMAIL_READER_PW=$EMAIL_READER_PW
 PG_DSN_INDEXER=postgresql://ges_mail_indexer:$EMAIL_INDEXER_PW@127.0.0.1:5432/ges_mail
 PG_DSN_READER=postgresql://ges_mail_reader:$EMAIL_READER_PW@127.0.0.1:5432/ges_mail
-# LAN access form (used from GES051WS, etc):
-PG_DSN_INDEXER_LAN=postgresql://ges_mail_indexer:$EMAIL_INDEXER_PW@10.0.1.89:5432/ges_mail
-PG_DSN_READER_LAN=postgresql://ges_mail_reader:$EMAIL_READER_PW@10.0.1.89:5432/ges_mail
+# LAN access form (used from admin workstations):
+PG_DSN_INDEXER_LAN=postgresql://ges_mail_indexer:$EMAIL_INDEXER_PW@$PG_LAN_HOST:5432/ges_mail
+PG_DSN_READER_LAN=postgresql://ges_mail_reader:$EMAIL_READER_PW@$PG_LAN_HOST:5432/ges_mail
 EOF
 chmod 600 $ENV_FILE
 chown root:root $ENV_FILE

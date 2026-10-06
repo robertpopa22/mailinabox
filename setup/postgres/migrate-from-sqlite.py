@@ -30,7 +30,7 @@ PG_COLS = [
 ]
 
 # SQLite columns from indexer.py + email_indexer.py schemas.
-# Live (MAIL02) has `mtime` + `indexed_at`. Archive (GES051WS) has `indexed_at` only
+# Live (mail server) has `mtime` + `indexed_at`. Archive (admin workstation) has `indexed_at` only
 # (no mtime — mbox files). Detect dynamically.
 SQLITE_BASE_COLS = [
     "message_id", "folder", "file_path",

@@ -15,7 +15,7 @@ Maildir layout (Mail-in-a-Box / Dovecot):
 Each file = one RFC822 message. Filename includes Dovecot UID + flags
 (e.g. "1234.M567P890.host:2,S"). Flags change file rename → mtime updates.
 
-Output: PostgreSQL database `emails` on MAIL02 (10.0.1.89:5432).
+Output: PostgreSQL database `emails` on the mail server (port 5432).
 DSN read from env PG_DSN, or fallback to /etc/mailinabox/postgres.env
 (line `PG_DSN_INDEXER=...`).
 
@@ -27,8 +27,8 @@ Schema (managed by setup/postgres/schema.sql):
   UNIQUE (source, file_path)
   indexer_meta(source, key, value) PK(source, key)
 
-This script ALWAYS writes source='live' (Dovecot live maildir on MAIL02).
-The archive indexer on GES051WS writes source='archive'.
+This script ALWAYS writes source='live' (Dovecot live maildir on the mail server).
+The archive indexer on an admin workstation writes source='archive'.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ from psycopg import sql
 
 DEFAULT_MAILBOX_ROOT = Path(os.environ.get("MAILBOX_ROOT", "/home/user-data/mail/mailboxes"))
 DEFAULT_PG_ENV_FILE = Path(os.environ.get("PG_ENV_FILE", "/etc/mailinabox/postgres.env"))
-SOURCE = "live"  # this indexer always targets the live Dovecot maildir on MAIL02
+SOURCE = "live"  # this indexer always targets the live Dovecot maildir on the mail server
 
 # Skip these mailbox subfolders (huge or noisy, low value to index)
 SKIP_FOLDERS = {".Trash", ".Spam", ".Junk"}
@@ -122,7 +122,7 @@ def get_pg_conn(dsn: str | None = None) -> psycopg.Connection:
     conn = psycopg.connect(
         dsn,
         autocommit=False,
-        application_name="email-indexer-mail02",
+        application_name="email-indexer-live",
     )
     # Smoke test
     with conn.cursor() as cur:
@@ -173,7 +173,7 @@ def set_meta(conn: psycopg.Connection, key: str, value: str) -> None:
 # ----- maildir traversal ------------------------------------------------------
 
 def derive_folder_label(maildir_path: Path, root: Path) -> str:
-    """Convert /…/geseidl.ro/robert.popa/.Archive/cur → geseidl.ro/robert.popa/Archive."""
+    """Convert /…/example.com/user/.Archive/cur → example.com/user/Archive."""
     try:
         rel = maildir_path.relative_to(root)
     except ValueError:

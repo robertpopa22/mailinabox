@@ -16,7 +16,7 @@ echo "Installing rspamd spam filter..."
 # === INSTALL PACKAGES ===
 
 # Official rspamd.com apt repo: Ubuntu noble ships rspamd 3.8.x, but the gpt
-# module (secondary LLM spam filter) needs rspamd >= 3.9. Production (MAIL02)
+# module (secondary LLM spam filter) needs rspamd >= 3.9. Production
 # runs 4.1.0 from this repo since 2026-06-11.
 mkdir -p /etc/apt/keyrings
 if [ ! -f /etc/apt/keyrings/rspamd.gpg ]; then
@@ -464,8 +464,8 @@ actions = {
 EOF
 
 # === LOCAL LLM MODULE (secondary semantic spam filter, rspamd >= 3.9) ===
-# Rspamd connects only to MAIL02 loopback :11437. A restricted reverse SSH
-# tunnel terminates at WS51 Ollama loopback :11434; Ollama is not exposed in
+# Rspamd connects only to the server loopback :11437. A restricted reverse SSH
+# tunnel terminates at the Ollama host loopback :11434; Ollama is not exposed in
 # the LAN and no message is sent to a public model. Failures are fail-open.
 # The model is deliberately corroborative: marketing is neutral and generic
 # spam cannot reach add_header=5 from the LLM alone.

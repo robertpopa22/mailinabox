@@ -1,8 +1,8 @@
-# MAIL02 PostgreSQL 16 tuning — 46GB RAM / 56 cores
+# Mail server PostgreSQL 16 tuning — 46GB RAM / 56 cores
 # Append/override in /etc/postgresql/16/main/postgresql.conf
 
 # Network
-listen_addresses = '10.0.1.89, 127.0.0.1'
+listen_addresses = '<server-lan-ip>, 127.0.0.1'   # replace <server-lan-ip> before use
 port = 5432
 
 # Memory

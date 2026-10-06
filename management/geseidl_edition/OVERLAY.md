@@ -69,7 +69,7 @@ Toate customizările Geseidl, grupate. Sursă: feature branches existente + chec
 | **status** | badge versiune fork, NS/glue/resolve/MX/DNSSEC re-verificate public, site-live, MTA-STS real, **Spamhaus DQS**, backup extern | runtime | **implementat (v0.2.0)** |
 | **dns** | resolver → `127.0.0.1` (bind9 local) + spamhaus exception zones, idempotent, verify+rollback | provisioning (bind9) | **implementat (v0.2.0)** |
 | **ssl** | cert-provisioning resolve-check pe DNS public (patch idempotent) | provisioning (patch) | **implementat (v0.4.0)** |
-| **mail** | arhiva email (`always_bcc`) cod-gestionată din settings.yaml + **restricție acces IMAP per-cont la source IP** (Dovecot `allow_nets`, tabel sidecar `geseidl_imap_restrictions` + CLI `imap_restrict.py`) + monitor agregate DMARC (`gesit-alerte@`, alertă `dit@` numai la probleme) | provisioning | **implementat (v0.5.0 / allow_nets v0.9.0 / DMARC v0.10.0)** |
+| **mail** | arhiva email (`always_bcc`) cod-gestionată din settings.yaml + **restricție acces IMAP per-cont la source IP** (Dovecot `allow_nets`, tabel sidecar `geseidl_imap_restrictions` + CLI `imap_restrict.py`) + monitor agregate DMARC (mailbox tehnic dedicat, alertă către operator numai la probleme) | provisioning | **implementat (v0.5.0 / allow_nets v0.9.0 / DMARC v0.10.0)** |
 | **web** | webmail-subdomain (`mail.<domeniu>/mail/` + branding HTTP_HOST), patch-uri idempotente | provisioning (patch) | **implementat (v0.6.0)** |
 | **spam** | rspamd: fișiere noi fork-tracked (installer 446l `setup/rspamd.sh` + UI `system-spam.html`) + 4 patch-uri integrare (mail-postfix/spamassassin/daemon-api/index, signature-gate, dry-run+revert) | provisioning + runtime | **implementat (v0.8.0)** |
 
@@ -92,8 +92,8 @@ Principiu cheie: **NU mascăm orbește**. Re-verificăm fiecare eroare față de
 
 Cauze rădăcină ale false-pozitivelor pe acest box:
 1. **DNS extern** — domeniile sunt pe Cloudflare; MiaB se așteaptă să fie EL nameserverul.
-2. **NAT + resolver split-horizon** — box `81.196.135.66` public / `10.0.1.89` privat; resolverul
-   intern (AD) întoarce IP-uri interne. Publicul e corect.
+2. **NAT + resolver split-horizon** — box cu IP public și IP privat distincte; resolverul
+   intern (de ex. un DNS de domeniu) întoarce IP-uri interne. Publicul e corect.
 
 | Check upstream | Re-verificare overlay | Rezultat |
 |---|---|---|
@@ -101,7 +101,7 @@ Cauze rădăcină ale false-pozitivelor pe acest box:
 | NS / glue records „incorecte" | dacă NS public ≠ box ⇒ DNS extern intenționat | ✓ „DNS gestionat extern" |
 | „trebuie să rezolve la IP-ul box" (subdomenii servite) | A public == IP public box? | ✓ dacă da, altfel rămâne ✖ |
 | „ar trebui să rezolve la box" (site găzduit altundeva) | înlocuit cu **site-live** (HTTP/HTTPS GET) | ✓ dacă site răspunde |
-| MX „lipsă" | MX public == `mail.geseidl.ro`? | ✓ dacă da, altfel ✖ |
+| MX „lipsă" | MX public == `$PRIMARY_HOSTNAME`? | ✓ dacă da, altfel ✖ |
 | DNSSEC DS lipsă/greșit | lanț DNSSEC valid în DNS public? | ✓ dacă valid, altfel ✖ |
 | MTA-STS lipsă | policy reală (TXT `_mta-sts` + `https://mta-sts.<d>/.well-known/mta-sts.txt`) | ✓ dacă există, ✖ acționabil dacă nu |
 
@@ -147,5 +147,4 @@ sudo systemctl restart mailinabox
 
 ## Vezi și
 
-- Infra MAIL02: `NET-ADMIN/GESEIDL/GES-MAIL01/` (folder = denumire veche; serverul e MAIL02)
 - Fork: `robertpopa22/mailinabox`

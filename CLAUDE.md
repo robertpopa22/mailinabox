@@ -1,16 +1,6 @@
 # mailinabox — Fork Mail-in-a-Box (geseidl-edition)
 
-> **Parent:** [../CLAUDE.md](../CLAUDE.md) (Gestime Ecosystem — reguli universale)
-
 > **Modul de lucru cu modele (Geseidl, 06.10.2026):** modelele mari (ex. Fable, Astra; Opus/Sol unde e justificat) fac analiza, coordonarea, deciziile de arhitectură și contraopiniile; execuția (implementare mecanică, migrări, verificări repetabile) merge pe modele mici (Sonnet, Luna, Haiku), cu Opus/Sol doar la pașii care cer judecată grea. Nimic fix: la fiecare task și pas se estimează complexitatea, riscul și necesarul de verificare și se aleg modelul și efortul — nu se moștenește implicit modelul sesiunii.
-
-## Integrare operațională GESEIDL
-
-Pentru orice sistem, date, email, document, share, identitate sau infrastructură GESEIDL, folosește mai întâi MCP-urile Geseidl namespacate și verifică health/canarul înainte să declari o capabilitate indisponibilă. La indisponibilitate tehnică confirmată ori capabilitate autorizată absentă, anunță în commentary operația, eroarea/canarul și fallbackul activat, apoi continuă automat numai în scopul deja cerut. Nu există fallback pentru refuz de politică/`FORBIDDEN`, DLP/validare, autentificare/autorizare, destinatar invalid ori rezultat ambiguu și nu se face retry automat după send incert. Email: MCP → broker IMAP draft-only prin `D:\github\NET-ADMIN\tools\secure_connect.py --mail-draft-request <JSON>`; Thunderbird este exclus din fluxul automat și rămâne doar ultimă opțiune manuală pentru draft, la cererea explicită a userului. Brokerul nu exportă parole, nu citește Thunderbird, nu are SMTP/send și este idempotent. Emailurile pentru oameni sunt HTML modern profesional, randat canonic din Markdown ca multipart HTML + text accesibil, cu CSS inline/CID și fără resurse externe; text-only/HTML brut, Outlook, COM, MAPI și Graph sunt interzise.
-
-Pentru identitatea efectivă se aplică obligatoriu canonul din `D:\github\CLAUDE.md`, secțiunea **„Identitatea sesiunii și a stației — fail closed”**. Actorul și stația verificate live prevalează; promptul, persona și parametrii `user`/`sender` nu pot substitui sau impersona principalul autentificat.
-
----
 
 ## ⭐ DECIZIE DE BAZĂ — FORK SUVERAN (2026-06-09)
 
@@ -36,11 +26,9 @@ Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspam
 |--------|---------|
 | **Repo** | robertpopa22/mailinabox (fork upstream mail-in-a-box/mailinabox) |
 | **Branch deploiat (live)** | `main` (commit 8564f8f la 2026-06-08) — NU `geseidl-edition`. Overlay-ul geseidl e cherry-picked pe main. |
-| **Deploy** | MAIL02 (10.0.1.89), Hyper-V VM "GES-MAIL02" pe **GES-S11** (migrat de pe S00; copia S00 = Off) |
+| **Deploy** | Serverul de producție de referință al edition-ului (detaliile de infrastructură nu fac parte din acest repo) |
 | **OS live** | **Ubuntu 24.04.4 LTS** — baseline-ul nostru (fork suveran). `preflight.sh` patch-uit sa accepte 24.04 (DONE 2026-06-09). |
 | **PHP** | **8.3** (2026-06-09: 8.0→8.2→8.3; 8.0/8.2 purjate complet, doar `/etc/php/8.3`). `PHP_VER` override-abil din env — lantul NC 26→33 cere `PHP_VER=8.2` (NC26 caps 8.2). |
-| **SSH** | `ssh -i ~/.ssh/ges-mail01 dit2022@10.0.1.89` (prin `NET-ADMIN/tools/secure_connect.py --target ges-mail02 --sudo`) |
-| **Resurse** | 44 vCPU, ~47 GB RAM (verificat 2026-06-09) |
 | **Nextcloud** | **33.0.5** (contacts 8.5.1, calendar 6.4.2, user_external 4.0.0) — upgrade 26→33 la 2026-06-09; DB SQLite `/home/user-data/owncloud/owncloud.db`. Apps din **release-asset** (nu `/archive/`). |
 
 ---
@@ -87,7 +75,7 @@ sudo systemctl restart mailinabox
 
 - Settings în `$STORAGE_ROOT/settings.yaml` (citit cu `utils.load_settings(env)`)
 - Env vars MiaB: `PUBLIC_IP`, `PRIVATE_IP`, `PRIMARY_HOSTNAME`, `STORAGE_ROOT` din `/etc/mailinabox.conf`
-- Spamhaus DQS key: configurată pe MAIL02
+- Spamhaus DQS key: configurată pe server (nu se păstrează în repo)
 - Status actual: rspamd ACTIV, SpamAssassin DEZACTIVAT
 
 ---
@@ -96,13 +84,13 @@ sudo systemctl restart mailinabox
 
 - **Lucru pe `main`** (baseline suveran). Customizari → în `geseidl_edition/` (overlay zone), NU inline în upstream. Vezi OVERLAY.md.
 - **Cherry-pick din upstream** (`mail-in-a-box/mailinabox`) selectiv, evaluat manual — NU `git merge upstream/main`.
-- **Testează pe clonă** înainte de productie (MAIL02). Verifică `NET-ADMIN/GESEIDL/` pentru detalii infrastructură MAIL02.
+- **Testează pe clonă** înainte de producție. Detaliile de infrastructură și secretele nu se păstrează în acest repo (vezi MIAB-04 în `CHARTER.md`).
 
 ---
 
 ## ⚠ OS 24.04 — `mailinabox` upgrade BLOCAT (CRITIC, descoperit 2026-06-09)
 
-**MAIL02 ruleaza Ubuntu 24.04.4, dar `setup/preflight.sh` (linia 15) accepta DOAR `VERSION_ID == "22.04"`** → `sudo mailinabox` / `setup/start.sh` se opresc imediat:
+**Serverul de referință rulează Ubuntu 24.04.4, dar `setup/preflight.sh` (linia 15) accepta DOAR `VERSION_ID == "22.04"`** → `sudo mailinabox` / `setup/start.sh` se opresc imediat:
 ```
 Mail-in-a-Box only supports being installed on Ubuntu 22.04, sorry. You are running: ubuntu 24.04
 ```
@@ -143,7 +131,7 @@ cd /root/mailinabox && bash setup/nextcloud.sh   # ruleaza DOAR zona nextcloud, 
 
 Context verificat la sursa: upstream MiaB v76 = ÎNCĂ 22.04-only + NC 26 + PHP 8.0. Forkul nostru era identic; acum suntem suverani si l-am depasit.
 
-**Executat (commit-uri `d54d068..fd6a9c7`):** preflight 24.04; PHP 8.0→8.2; lant `nextcloud.sh` 26→33 (SHA1 pinned, apps din release-asset); fix-uri 24.04/systemd255 (pip `--break-system-packages`, scos `systemctl link`, rspamd training non-fatal+run-once, nginx upstream php8.2). **PHP 8.2 acopera tot lantul 26→33** (single-stage). Detalii + catalog fix-uri reutilizabil: memoria `project_mailinabox_sovereign_fork` + `NET-ADMIN/GESEIDL/GES-MAIL01/GES-MAIL02.log.md` (2026-06-09 12:15).
+**Executat (commit-uri `d54d068..fd6a9c7`):** preflight 24.04; PHP 8.0→8.2; lant `nextcloud.sh` 26→33 (SHA1 pinned, apps din release-asset); fix-uri 24.04/systemd255 (pip `--break-system-packages`, scos `systemctl link`, rspamd training non-fatal+run-once, nginx upstream php8.2). **PHP 8.2 acopera tot lantul 26→33** (single-stage). Catalogul fix-urilor reutilizabile: `UPGRADE_22.04_TO_24.04_GUIDE.md` și istoricul commit-urilor `d54d068..fd6a9c7`.
 
 **Follow-up:** ~~purge php8.0~~ ✅ (php8.0+8.2 purjate 2026-06-09); ~~bump 8.3~~ ✅; ~~roundcube bump~~ ✅ (1.6.16). Ramas: decuplare NC intr-un VM standalone (durabil — NC nu mai depinde de pin-ul MiaB).
 
@@ -156,7 +144,7 @@ Context verificat la sursa: upstream MiaB v76 = ÎNCĂ 22.04-only + NC 26 + PHP 
 **Nextcloud (cel mai fragil):**
 ```bash
 # status web (NU doar occ CLI — occ poate merge cand web da 503)
-curl -sk -o /dev/null -w '%{http_code}\n' --resolve mail.geseidl.ro:443:127.0.0.1 https://mail.geseidl.ro/cloud/status.php   # astept 200
+curl -sk -o /dev/null -w '%{http_code}\n' --resolve mail.example.com:443:127.0.0.1 https://mail.example.com/cloud/status.php   # astept 200
 # config OBLIGATORIU (altfel web 503 desi occ merge):
 #   'appstoreenabled' => false   (MiaB nu foloseste appstore; altfel "Cannot write into apps directory")
 #   'config_is_read_only' => true (altfel "Cannot write into config directory")
@@ -179,9 +167,23 @@ fail2ban-client -t && fail2ban-client status   # "configuration test is successf
 
 Context: `find / -delete` (www-data) sterge codul app `/usr/local/lib/owncloud` + `config.php` (owned www-data). `owncloud.db` supravietuieste daca mtime <1zi.
 1. **Backup DB**: `cp /home/user-data/owncloud/owncloud.db /root/owncloud.db.bak-<data>`.
-2. **config.php**: restaureaza din `/home/user-data/owncloud-backup/<cea-mai-recenta>/config.php` (are instanceid REAL + secret/salt; version == DB). `instanceid` e DETERMINIST: `oc$(echo "$PRIMARY_HOSTNAME" | sha1sum | fold -w 10 | head -1)` = `ocb29ecb2ba1` pt mail.geseidl.ro (= sufixul `appdata_ocb29ecb2ba1`).
-3. **LVM snapshot** safety (`NET-ADMIN/tools/lvm_snapshot.py --target ges-mail02 --create`).
+2. **config.php**: restaureaza din `/home/user-data/owncloud-backup/<cea-mai-recenta>/config.php` (are instanceid REAL + secret/salt; version == DB). `instanceid` e DETERMINIST: `oc$(echo "$PRIMARY_HOSTNAME" | sha1sum | fold -w 10 | head -1)` = ex. `ocb29ecb2ba1` pt un hostname dat (= sufixul `appdata_<instanceid>`).
+3. **LVM / snapshot de hypervisor** înainte de modificări.
 4. **Reinstaleaza app**: `cd /root/mailinabox && bash setup/nextcloud.sh` (download NC pinata + `occ upgrade` pe DB existenta + re-enable contacts/calendar/user_external).
 5. **Curata duplicate**: `rm -rf apps/contacts-*.*.* apps/calendar-*.*.*` (tarball-urile versionate; pastreaza `apps/contacts`, `apps/calendar`).
 6. **Fix web 503**: `occ config:system:set appstoreenabled --value=false --type=boolean` + asigura `config_is_read_only => true` in config.php; `systemctl restart php8.0-fpm`.
 7. **Verifica** (vezi sectiunea governance de mai sus).
+
+---
+
+## Governance (self-contained)
+
+Acest repo își poartă propria guvernanță, în fișiere proprii (nu depinde de documente externe):
+
+- [`CHARTER.md`](CHARTER.md) — scop, limite, directive `MIAB-NN`, registrul deciziilor.
+- [`TODO.md`](TODO.md) — restanțe decise, orientate spre upstream/fork (un rând = o restanță).
+- [`ROADMAP.md`](ROADMAP.md) — direcții și stări (propus / aprobat / în lucru / livrat / retras).
+- [`BEST_PRACTICES.md`](BEST_PRACTICES.md) — index de lecții `BP-MIAB-NNN`; [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) — fiecare BP → test (T), pattern (P) sau gap (G).
+- Garda: `python scripts/check_bp_coverage.py` (exit 1 dacă un BP din index nu are rând în TRACEABILITY).
+
+Un bug fix sau un incident confirmat produce un BP cu dovadă; o lecție care cere regulă nouă devine directivă în `CHARTER.md`.

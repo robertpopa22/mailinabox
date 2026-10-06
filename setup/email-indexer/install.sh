@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install email indexer on Mail-in-a-Box server.
-# Run as root on MAIL02 (10.0.1.89).
+# Run as root on the mail server.
 #
 # Prerequisite: PostgreSQL must already be installed and `/etc/mailinabox/postgres.env`
 # must exist with PG_DSN_INDEXER=... (see setup/postgres/install.sh).

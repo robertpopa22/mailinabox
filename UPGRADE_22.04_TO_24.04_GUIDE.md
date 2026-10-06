@@ -136,7 +136,7 @@ The VM backup reads from the checkpoint, so it can run in parallel with subseque
 
 ```powershell
 # Veeam B&R
-Start-VBRJob -Job (Get-VBRJob -Name "MAIL02-Backup") -FullBackup
+Start-VBRJob -Job (Get-VBRJob -Name "<server>-Backup") -FullBackup
 ```
 
 ### 1.4 Boot the VM

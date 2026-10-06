@@ -52,7 +52,6 @@ cat > "$LIST" <<'EOF'
 /etc/systemd/system/weekly-reboot.service
 /etc/modprobe.d
 /usr/local/bin/jp.py
-/usr/local/bin/naiad_dns_monitor.py
 /usr/local/bin/rspamd_learn_report.py
 /root/spam-diagnostic
 /root/.bashrc

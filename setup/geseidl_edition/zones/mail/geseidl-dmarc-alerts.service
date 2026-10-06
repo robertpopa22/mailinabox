@@ -5,6 +5,7 @@ Wants=dovecot.service postfix.service
 
 [Service]
 Type=oneshot
+EnvironmentFile=-/etc/geseidl-dmarc-alerts.env
 ExecStart=/usr/local/libexec/geseidl-dmarc-alerts
 User=root
 Group=root

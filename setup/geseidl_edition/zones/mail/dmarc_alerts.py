@@ -15,6 +15,7 @@ import hashlib
 import html
 import json
 import logging
+import os
 import re
 import sqlite3
 import subprocess
@@ -33,18 +34,18 @@ from xml.etree import ElementTree as ET
 
 LOGGER = logging.getLogger("geseidl-dmarc-alerts")
 
-DEFAULT_MAILBOX = "gesit-alerte@geseidl.ro"
-DEFAULT_NOTIFY = "dit@geseidl.ro"
-DEFAULT_SENDER = "gesit-alerte@geseidl.ro"
+# Deployment values come from the environment (systemd EnvironmentFile=
+# /etc/geseidl-dmarc-alerts.env); the fallbacks are neutral placeholders.
+DEFAULT_MAILBOX = os.environ.get("DMARC_ALERTS_MAILBOX", "dmarc-reports@example.com")
+DEFAULT_NOTIFY = os.environ.get("DMARC_ALERTS_NOTIFY", "postmaster@example.com")
+DEFAULT_SENDER = os.environ.get("DMARC_ALERTS_SENDER", DEFAULT_MAILBOX)
 DEFAULT_STATE_DIR = Path("/var/lib/geseidl-dmarc-alerts")
-DEFAULT_ALLOWED_DOMAINS = (
-	"asociatiahcd.ro",
-	"biamco.ro",
-	"conta-ploiesti.ro",
-	"energycycling.ro",
-	"geseidl.ro",
+DEFAULT_ALLOWED_DOMAINS = tuple(
+	d.strip() for d in os.environ.get("DMARC_ALERTS_DOMAINS", "example.com").split(",") if d.strip()
 )
-DEFAULT_ALLOWED_SOURCE_IPS = ("81.196.135.66",)
+DEFAULT_ALLOWED_SOURCE_IPS = tuple(
+	ip.strip() for ip in os.environ.get("DMARC_ALERTS_SOURCE_IPS", "192.0.2.1").split(",") if ip.strip()
+)
 
 SUBJECT_QUERIES = ("Report domain:", "DMARC Aggregate Report")
 MAX_ENCODED_PART_BYTES = 25 * 1024 * 1024
@@ -414,7 +415,7 @@ def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str
 	plain_lines.extend(
 		(
 			"",
-			"Acesta este un rezumat automat. Rapoartele XML originale rămân în mailboxul tehnic gesit-alerte@geseidl.ro.",
+			"Acesta este un rezumat automat. Rapoartele XML originale rămân în mailboxul tehnic dedicat rapoartelor.",
 		)
 	)
 	html_body = f"""<!doctype html>
@@ -434,7 +435,7 @@ def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str
 	message["To"] = notify
 	message["Subject"] = f"[ALERTĂ DMARC] {affected} mesaje afectate — {', '.join(domains)}"
 	message["Date"] = format_datetime(datetime.now(UTC))
-	message["Message-ID"] = f"<dmarc-alert-{digest}@geseidl.ro>"
+	message["Message-ID"] = f"<dmarc-alert-{digest}@{sender.rpartition('@')[2] or 'localhost'}>"
 	message["Auto-Submitted"] = "auto-generated"
 	message["X-Geseidl-Status"] = "WARNING"
 	message["X-Geseidl-Alert-Key"] = digest
@@ -512,7 +513,7 @@ def process_scan(
 	return summary
 
 
-def _sample_xml(*, dkim: str, spf: str, disposition: str = "none", domain: str = "geseidl.ro") -> bytes:
+def _sample_xml(*, dkim: str, spf: str, disposition: str = "none", domain: str = "example.com") -> bytes:
 	return f"""<?xml version="1.0"?>
 <feedback>
 <report_metadata><org_name>self-test</org_name><report_id>self-test-{dkim}-{spf}-{disposition}</report_id><date_range><begin>1788048000</begin><end>1788134399</end></date_range></report_metadata>
