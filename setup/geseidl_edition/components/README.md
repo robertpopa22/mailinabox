@@ -57,3 +57,41 @@ APT refresh and the bounded migration to the operator. The ordinary upstream
 Ubuntu channel remains unchanged unless this Geseidl option is explicitly used.
 
 Source: [ISC-maintained BIND packages](https://kb.isc.org/docs/isc-packages-for-bind-9).
+
+`dovecot24.py` converts a reviewed SQLite/Maildir 2.3 configuration to a 2.4
+candidate, using operator-supplied private parameters. Unsupported settings fail
+closed. It preserves SQL user/network restrictions, identity/path templates,
+byte quotas and percentage grace, SMTP auth/LMTP endpoints, TLS, personal/global
+Sieve and COPY/APPEND learning rules. It explicitly retains trusted localhost
+authentication; 2.4's `ssl=required` no longer bypasses trusted networks. Legacy
+long variable aliases also need conversion: a successful login with auth-policy
+fallback is not evidence that the policy integration works.
+
+The candidate uses configuration version 2.4.5. Storage defaults to 2.3.21 for
+initial recovery tests; `--storage-version 2.4.5` enables the current storage
+features, including the protected THREAD cache format. Before production, test
+the final format and authenticated old-package recovery with messages written
+by the new server. Preserve UIDVALIDITY and UIDs; never restore an old mailbox or
+user database over messages that arrived after reopening.
+
+After a separately tested migration, store its trusted profile as root:root,
+0600 at `/etc/mailinabox-geseidl/dovecot24.json`, inside a root:root, 0700
+directory. `dovecot24_setup.py` validates ownership, reconciles that profile with
+the box's existing storage root/hostname, checks the actual 2.4 parser and writes
+the main config atomically only when needed. The edition's setup branch uses this
+path for an installed 2.4 server; the inherited 2.3 setup remains available.
+Keep the private profile in encrypted deployment backups. It contains a policy
+nonce and configuration and must never be committed to this public repository.
+Package channel changes and initial migration remain explicit operator actions.
+
+Required acceptance includes IMAP143 for trusted applications, verified IMAPS/
+POP3S, wrong-password and disallowed-source rejection, SQL injection rejection,
+native SMTP-auth socket, local LMTP delivery/quotas, ManageSieve CRUD, prohibited
+redirect execution with local keep, spam/ham learning callbacks and working
+auth-policy HTTP. Check actual policy errors, not only a successful login. Use
+private network, spool, logs, runtime and state; Dovecot's instance registry also
+needs isolation. Native service options that transient D-Bus units cannot set
+must be tested through a copy of the actual native unit.
+
+Sources: [Dovecot 2.4 upgrade guide](https://doc.dovecot.org/latest/installation/upgrade/2.3-to-2.4.html),
+[publisher releases and signing key](https://github.com/dovecot/core/releases).

@@ -39,3 +39,20 @@ Directive: MIAB-03, MIAB-05, MIAB-07, MIAB-12.
   refuses conflicting edition files before changing the main configuration;
   isolated native startup/DNSSEC and old-package recovery remain required.
 - Directive: MIAB-11, MIAB-12.
+
+## BP-MIAB-013 — Verify authentication policy beyond login success
+
+A Dovecot login can succeed after auth-policy evaluation fails and falls back.
+Legacy long variables such as `%{rip}` are removed in 2.4, even when the typed
+configuration parser accepts their strings. Convert long and short variables;
+validate the actual HTTP request schema and inspect policy errors. Combine this
+with wrong-password, source-network and SQL-injection negative controls.
+
+Runtime paths include the instance registry, spool, logs and Unix sockets. Do not
+copy ephemeral sockets as persisted state. Native service properties unavailable
+through transient D-Bus units need an actual native-unit fixture. Test the final
+storage format, then recover old authenticated packages with new mail retained.
+Keep UIDVALIDITY/UIDs and verify Sieve/auth/quotas after recovery. A Sieve editor
+accepting a literal redirect does not imply execution is allowed; test runtime
+prohibition, local keep and an empty isolated outbound queue.
+Directive: MIAB-03, MIAB-05, MIAB-07, MIAB-11, MIAB-12.

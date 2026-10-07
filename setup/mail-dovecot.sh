@@ -18,6 +18,16 @@
 source setup/functions.sh # load our functions
 source /etc/mailinabox.conf # load global vars
 
+# Optional edition channel: preserve the operator-tested 2.4 profile. The
+# upstream distribution-package path below remains the default for 2.3.
+if [ -f .geseidl-edition ] && command -v dovecot >/dev/null 2>&1 \
+    && [[ "$(dovecot --version)" == 2.4.* ]]; then
+	python3 setup/geseidl_edition/components/dovecot24_setup.py \
+		--storage-root "$STORAGE_ROOT" --primary-hostname "$PRIMARY_HOSTNAME"
+	restart_service dovecot
+	return 0 2>/dev/null || exit 0
+fi
+
 
 # Install packages for dovecot. These are all core dovecot plugins,
 # but dovecot-lucene is packaged by *us* in the Mail-in-a-Box PPA,
