@@ -125,3 +125,23 @@ Sources: [Postfix stable source](https://postfix.cs.utah.edu/source/),
 [proxymap](https://www.postfix.org/proxymap.8.html),
 [TLS defaults](https://www.postfix.org/DEPRECATION_README.html),
 [SQLite read-only WAL](https://sqlite.org/wal.html#read_only_databases).
+
+## Optional nginx stable channel
+
+`nginx_channel.py` stages the official Ubuntu 24.04 stable package using the
+publisher key bundle, signed InRelease and package hashes. Enable its Signed-By
+channel separately only after migration and recovery acceptance; pin nginx alone,
+excluding other packages from this origin. Stable is distinct from mainline.
+
+The publisher package replaces Ubuntu nginx-common. Preserve all existing
+configuration/snippets and inspect native conffile/service handling; test package
+installation as well as candidate parsing. Keep authenticated old packages.
+`nginx_http2.py` preserves pre-1.25.1 syntax and adapts legacy listeners on current
+versions, refusing conflicting or mixed listener scope. The edition renderer
+uses it before writing its generated configuration. No additional protocol or
+dynamic module is activated. Test isolated native TLS/ALPN/HTTP2/FastCGI with
+private runtime/log/cache/FPM session paths and verified GET/POST methods, then
+old-binary recovery and nominal application access after installation.
+
+Sources: [official package channel](https://nginx.org/en/linux_packages.html),
+[HTTP/2 directive](https://nginx.org/en/docs/http/ngx_http_v2_module.html).

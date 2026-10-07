@@ -84,3 +84,18 @@ databases and is never an automatic package postinst or routine setup action.
 Prove new-version cold startup, old-version delivery of newly queued mail and
 content preservation. Keep any unresolved mode or recovery limitation visible.
 Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.
+
+## BP-MIAB-016 — Preserve listener scope and verify actual protocol methods
+
+nginx 1.25.1 introduced the server-level HTTP/2 directive. Converting a legacy
+socket flag blindly can widen protocol scope when a server has mixed listeners.
+Preserve the older path, parse block/quoted/comment boundaries, reject ambiguous
+scope or conflicting policy and verify replay before using the current syntax.
+Keep native TLS/server configuration and package conffile lifecycle evidence.
+
+A client using a data option sends POST even with an empty body. A test labelled
+GET/POST must verify the observed request method, not infer it from body length.
+Use a private FPM socket/session/cache and read-only application data; network
+namespaces alone do not isolate host Unix sockets. Test actual TLS name/chain,
+ALPN, FastCGI and body buffering, then repeat with the recovery binary/config.
+Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.

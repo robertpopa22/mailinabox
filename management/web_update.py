@@ -116,6 +116,11 @@ def do_web_update(env):
 			nginx_conf += make_domain_config(domain, [template0, template3], ssl_certificates, env)
 
 	# Did the file change? If not, don't bother writing & restarting nginx.
+	# >>> GESEIDL EDITION OVERLAY >>>
+	from geseidl_edition.nginx_compat import adapt_generated
+	nginx_conf = adapt_generated(nginx_conf)
+	# <<< GESEIDL EDITION OVERLAY <<<
+
 	nginx_conf_fn = "/etc/nginx/conf.d/local.conf"
 	if os.path.exists(nginx_conf_fn):
 		with open(nginx_conf_fn, encoding='utf-8') as f:
