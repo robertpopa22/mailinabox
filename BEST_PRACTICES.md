@@ -21,3 +21,6 @@
 
 | ID | Title | Category | Link |
 |----|-------|----------|------|
+| BP-MIAB-001 | Review release pins as well as the fork Git head | Updates | [Details](docs/bp/updates.md) |
+| BP-MIAB-002 | Isolate clone instance IDs and temporary state | Updates | [Details](docs/bp/updates.md#bp-miab-002--isolate-clone-instance-ids-and-temporary-state) |
+| BP-MIAB-003 | Set generated webmail config readability explicitly | Updates | [Details](docs/bp/updates.md#bp-miab-003--set-generated-webmail-config-readability-explicitly) |

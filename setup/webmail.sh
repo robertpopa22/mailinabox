@@ -36,8 +36,8 @@ apt_install \
 #   https://github.com/mstilkerich/rcmcarddav/releases
 # The easiest way to get the package hashes is to run this script and get the hash from
 # the error message.
-VERSION=1.6.17
-HASH=c99c8c79852977f17a73111837aaaba000c5d634
+VERSION=1.6.19
+HASH=d30d11f91857b1962879e06a19ef217dceeb506c
 PERSISTENT_LOGIN_VERSION=bde7b6840c7d91de627ea14e81cf4133cbb3c07a # version 5.3
 HTML5_NOTIFIER_VERSION=68d9ca194212e15b3c7225eb6085dbcf02fd13d7 # version 0.6.4+
 CARDDAV_VERSION=4.4.3
@@ -181,6 +181,8 @@ cat > ${RCM_PLUGIN_DIR}/carddav/config.inc.php <<EOF;
 EOF
 
 # Create writable directories.
+chown root:www-data "$RCM_CONFIG"
+chmod 640 "$RCM_CONFIG"
 mkdir -p /var/log/roundcubemail /var/tmp/roundcubemail "$STORAGE_ROOT/mail/roundcube"
 chown -R www-data:www-data /var/log/roundcubemail /var/tmp/roundcubemail "$STORAGE_ROOT/mail/roundcube"
 
@@ -199,6 +201,9 @@ tools/editconf.py ${RCM_PLUGIN_DIR}/password/config.inc.php \
 	"\$config['password_query']='UPDATE users SET password=%P WHERE email=%u';" \
 	"\$config['password_algorithm']='sha512-crypt';" \
 	"\$config['password_algorithm_prefix']='{SHA512-CRYPT}';"
+
+chown root:www-data "${RCM_PLUGIN_DIR}/password/config.inc.php"
+chmod 640 "${RCM_PLUGIN_DIR}/password/config.inc.php"
 
 # so PHP can use doveadm, for the password changing plugin
 usermod -a -G dovecot www-data
