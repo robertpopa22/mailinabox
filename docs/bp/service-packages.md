@@ -24,3 +24,18 @@ parsers, then validate the running daemon. General management control belongs in
 upstream configuration; the optional edition package preserves native RRL
 defaults, and deployment-specific values stay explicit outside the public source.
 Directive: MIAB-03, MIAB-05, MIAB-07, MIAB-12.
+## BP-MIAB-012 — Test native conffile removal during origin changes
+
+- Context: switching BIND from Ubuntu 9.18 packages to ISC stable 9.20 packages.
+- Mistake: testing candidate binaries with the old configuration passed, but the
+  package installation removed obsolete default-zone files and replaced an
+  unmodified main configuration.
+- Cause: a runtime-only clone omitted native package conffile lifecycle changes.
+- Correct: inspect maintainer scripts and conffile lists; preserve existing
+  standard zone content in edition-owned files before changing package origin.
+  Use `--force-confold`, verify the effective configuration after installation,
+  and retain authenticated old packages for bounded recovery.
+- Proof: `tests/test_bind_defaults.py` simulates obsolete-file removal and
+  refuses conflicting edition files before changing the main configuration;
+  isolated native startup/DNSSEC and old-package recovery remain required.
+- Directive: MIAB-11, MIAB-12.

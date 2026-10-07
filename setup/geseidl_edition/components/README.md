@@ -30,3 +30,30 @@ there is no unattended package-channel migration in this implementation.
 
 Sources: [NSD releases](https://nlnetlabs.nl/projects/nsd/download/),
 [upstream contribution ledger](../../../docs/upstream/CONTRIBUTIONS.md).
+
+`bind_channel.py --work DIRECTORY --version 9.20.29` stages the five installed
+BIND packages from ISC's stable Ubuntu 24.04 repository. It verifies the full
+publisher signing-key fingerprint, the InRelease signature, the package-index
+checksum and each package checksum. It refuses a different publisher version or
+an incomplete package set. Staging writes only to a new private directory and
+does not install packages or restart services.
+
+For an existing Ubuntu installation, run `bind_defaults.py` before installing
+the ISC packages. ISC removes Ubuntu's default-zone conffiles and replaces an
+unmodified `named.conf`. The adapter copies the existing standard zone files
+under edition-owned names and updates the include, so `--force-confold` preserves
+the configuration. It refuses nonstandard files or conflicts; it does not change
+zone data, resolver options, keys or service state. Test both the new and old
+packages with these preserved files. Native package integration includes conffile
+removal as well as binary/runtime compatibility.
+
+After testing the exact binaries, native service command, effective resolver
+configuration, DNSSEC positive/negative answers and old-package recovery, an
+operator may use the separate `--enable-channel` option with the same directory
+and reviewed version. This persists a Signed-By key and repository limited to
+BIND packages; other packages from that origin have negative preference. It
+refuses conflicting existing channel files. It installs no packages and leaves
+APT refresh and the bounded migration to the operator. The ordinary upstream
+Ubuntu channel remains unchanged unless this Geseidl option is explicitly used.
+
+Source: [ISC-maintained BIND packages](https://kb.isc.org/docs/isc-packages-for-bind-9).

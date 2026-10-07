@@ -14,6 +14,7 @@
 | BP-MIAB-009 | T/P | Upstream-based branch `codex/upstream-status-apt`, stdlib `tests/test_apt_updates.py`, zero edition imports; ledger records exact base/commit and prepared vs submitted status. |
 | BP-MIAB-010 | P | Builder refuses a compiled CONFIGFILE other than the native default; require isolated native-command/service-hardening proof before deployment, and reset only the target start-limit state during package rollback. |
 | BP-MIAB-011 | P | Optional NSD recipe enables RRL defaults; compare native and publisher control/security settings with their parsers and live control status, and carry existing explicit deployment policy forward. |
+| BP-MIAB-012 | T/P | `tests/test_bind_defaults.py` simulates ISC removal of Ubuntu default-zone conffiles and verifies conflict refusal; optional `bind_defaults.py` preserves standard zone content under edition-owned paths before installation. Compare pre/post package configuration, not just pre-install candidate binaries. |
 | BP-MIAB-002 | P | A rehearsal config sets a unique `instanceid` and private `tempdirectory`; copied data/config paths alone do not isolate Nextcloud `FileSequence` locks. |
 | BP-MIAB-003 | P | `setup/webmail.sh` explicitly sets main/password config to root:www-data, 0640; verify reads and authenticated webmail access as the service user. |
 | BP-MIAB-004 | T | `tests/test_geseidl_reporting.py`: captured SMTP diagnostics and preserved failures; noncontiguous changes; new APT dependencies; held/unknown/reboot states; idempotent hook persistence. |
