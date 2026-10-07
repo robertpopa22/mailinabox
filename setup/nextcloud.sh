@@ -452,7 +452,7 @@ if [ $E -ne 0 ] && [ $E -ne 3 ]; then exit 1; fi
 # Historical app upgrades may record a migration without its SQLite table.
 # Restore only additive guarantees; never rebuild or discard populated tables.
 if [ -f "$STORAGE_ROOT/owncloud/owncloud.db" ]; then
-	sudo -u www-data python3 setup/geseidl_edition/nextcloud_sqlite.py \
+	python3 setup/geseidl_edition/nextcloud_sqlite.py \
 		--code /usr/local/lib/owncloud --database "$STORAGE_ROOT/owncloud/owncloud.db" \
 		--php "php$PHP_VER" || exit 1
 fi

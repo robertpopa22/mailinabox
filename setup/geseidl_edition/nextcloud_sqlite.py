@@ -5,6 +5,7 @@ Never drop tables, rebuild populated tables, or alter application data. Table DD
 comes from the installed publisher migration schema, not a parallel definition.
 """
 import argparse
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -42,4 +43,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if not args.database.is_file() or args.database.is_symlink():
         parser.error('Expected an existing regular SQLite database')
+    if os.geteuid() == 0:
+        # Provisioning sources may live below /root. Load this script as root,
+        # then perform every application/SQLite operation as the database owner.
+        owner = args.database.stat()
+        if owner.st_uid == 0:
+            parser.error('Database owner must be an application user')
+        os.setgroups([])
+        os.setgid(owner.st_gid)
+        os.setuid(owner.st_uid)
+    dbtype = subprocess.check_output([args.php, str(args.code / 'occ'),
+        'config:system:get', 'dbtype'], text=True).strip()
+    datadir = subprocess.check_output([args.php, str(args.code / 'occ'),
+        'config:system:get', 'datadirectory'], text=True).strip()
+    if dbtype != 'sqlite3' or Path(datadir).resolve() != args.database.parent.resolve():
+        parser.error('Configured application database does not match the target')
     repair(args.code, args.database, args.php)
