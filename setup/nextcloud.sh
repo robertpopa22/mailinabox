@@ -21,8 +21,8 @@ echo "Installing Nextcloud (contacts/calendar)..."
 #   we automatically install intermediate versions as needed.
 # * The hash is the SHA1 hash of the ZIP package, which you can find by just running this script and
 #   copying it from the error message when it doesn't match what is below.
-nextcloud_ver=33.0.9
-nextcloud_hash=2a49b0cd4ebcdea70df46260104e949e29f937ba
+nextcloud_ver=35.0.1
+nextcloud_hash=d3308ef81e0cc213256d1f7d19a1082c0527c63e
 
 # Nextcloud apps
 # --------------
@@ -36,12 +36,12 @@ nextcloud_hash=2a49b0cd4ebcdea70df46260104e949e29f937ba
 # the error message when it doesn't match what is below:
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/contacts
-contacts_ver=8.5.1
-contacts_hash=dd8c6ee70a505e51f521dfba2dff5f3d7da1adf6
+contacts_ver=8.9.1
+contacts_hash=ec22abf78e5caf796b326c4838b1162d29970a9e
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/calendar
-calendar_ver=6.4.2
-calendar_hash=b014219097038e424501d277b7264f752c0eff2b
+calendar_ver=6.6.2
+calendar_hash=f396ede3d50b15e4975319de7cae58b035f30b4c
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/user_external
 user_external_ver=4.0.0
@@ -134,6 +134,13 @@ InstallNextcloud() {
 		rm /tmp/user_external.tgz
 	fi
 
+	# >>> GESEIDL EDITION OVERLAY >>>
+	if [[ "$version" =~ ^(34|35)\. ]]; then
+		python3 setup/geseidl_edition/nextcloud_compat.py \
+			--app /usr/local/lib/owncloud/apps/user_external --target-major "${version%%.*}"
+	fi
+	# <<< GESEIDL EDITION OVERLAY <<<
+
 	# Fix weird permissions.
 	chmod 750 /usr/local/lib/owncloud/{apps,config}
 
@@ -161,6 +168,17 @@ InstallNextcloud() {
 			sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/occ maintenance:mode --off
 			echo "...which seemed to work."
 		fi
+		sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/occ maintenance:mode --off
+
+		# >>> GESEIDL EDITION OVERLAY >>>
+		if [[ "$version" =~ ^(34|35)\. ]]; then
+			sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/occ app:enable geseidl_user_external || exit 1
+			python3 setup/geseidl_edition/nextcloud_compat.py \
+				--app /usr/local/lib/owncloud/apps/user_external --target-major "${version%%.*}" \
+				--config "$STORAGE_ROOT/owncloud/config.php" --php "php$PHP_VER" || exit 1
+			sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/occ app:disable user_external
+		fi
+		# <<< GESEIDL EDITION OVERLAY <<<
 
 		# Add missing indices. NextCloud didn't include this in the normal upgrade because it might take some time.
 		sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/occ db:add-missing-indices
@@ -285,6 +303,14 @@ if [ ! -d /usr/local/lib/owncloud/ ] || [[ ! ${CURRENT_NEXTCLOUD_VER} =~ ^$nextc
 			CURRENT_NEXTCLOUD_VER="32.0.3"
 		fi
 		# <<< GESEIDL SOVEREIGN FORK <<<
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^32 ]]; then
+			InstallNextcloud 33.0.9 2a49b0cd4ebcdea70df46260104e949e29f937ba 8.5.1 dd8c6ee70a505e51f521dfba2dff5f3d7da1adf6 6.4.2 b014219097038e424501d277b7264f752c0eff2b 4.0.0 214497dd8691f279ba3740797c565310f0793054
+			CURRENT_NEXTCLOUD_VER="33.0.9"
+		fi
+		if [[ ${CURRENT_NEXTCLOUD_VER} =~ ^33 ]]; then
+			InstallNextcloud 34.0.4 3912a29d610e159439b9b0962c169f207df3bf0b $contacts_ver $contacts_hash $calendar_ver $calendar_hash $user_external_ver $user_external_hash
+			CURRENT_NEXTCLOUD_VER="34.0.4"
+		fi
 	fi
 
 	InstallNextcloud $nextcloud_ver $nextcloud_hash $contacts_ver $contacts_hash $calendar_ver $calendar_hash $user_external_ver $user_external_hash
@@ -313,7 +339,7 @@ if [ ! -f "$STORAGE_ROOT/owncloud/owncloud.db" ]; then
   'overwrite.cli.url' => '/cloud',
   'user_backends' => array(
     array(
-      'class' => '\OCA\UserExternal\IMAP',
+      'class' => '\OCA\GeseidlUserExternal\IMAP',
       'arguments' => array(
         '127.0.0.1', 143, null, null, false, false
        ),
@@ -382,7 +408,7 @@ include("$STORAGE_ROOT/owncloud/config.php");
 
 \$CONFIG['user_backends'] = array(
   array(
-    'class' => '\OCA\UserExternal\IMAP',
+    'class' => '\OCA\GeseidlUserExternal\IMAP',
     'arguments' => array(
       '127.0.0.1', 143, null, null, false, false
     ),
@@ -411,7 +437,7 @@ chown www-data:www-data "$STORAGE_ROOT/owncloud/config.php"
 # user_external is what allows Nextcloud to use IMAP for login. The contacts
 # and calendar apps are the extensions we really care about here.
 hide_output sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/console.php app:disable firstrunwizard
-hide_output sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/console.php app:enable user_external
+hide_output sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/console.php app:enable geseidl_user_external
 hide_output sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/console.php app:enable contacts
 hide_output sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/console.php app:enable calendar
 

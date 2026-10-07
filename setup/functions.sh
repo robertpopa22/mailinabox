@@ -7,10 +7,10 @@ set -euo pipefail
 
 # GESEIDL SOVEREIGN FORK: PHP version is overridable from the environment so the
 # Nextcloud upgrade chain can be driven stage-by-stage (e.g. PHP_VER=8.2 ./setup/nextcloud.sh).
-# Default bumped 8.0 -> 8.3 (8.0 EOL Nov 2023; 8.2 deprecated in NC 33 + EOL Dec 2026).
-# NC 33 supports PHP 8.2-8.5; 8.3 is the recommended steady-state. The 26->33 upgrade
+# The steady-state target is PHP 8.5 for Nextcloud 35 and Roundcube 1.7.
+# Older installations require a staged runtime migration. The 26->33 upgrade
 # chain itself must run on <=8.2 (NC 26 caps at 8.2) — override with PHP_VER=8.2 for that.
-PHP_VER="${PHP_VER:-8.3}"
+PHP_VER="${PHP_VER:-8.5}"
 
 function hide_output {
 	# This function hides the output of a command unless the command fails

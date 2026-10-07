@@ -36,12 +36,12 @@ apt_install \
 #   https://github.com/mstilkerich/rcmcarddav/releases
 # The easiest way to get the package hashes is to run this script and get the hash from
 # the error message.
-VERSION=1.6.19
-HASH=d30d11f91857b1962879e06a19ef217dceeb506c
+VERSION=1.7.4
+HASH=c78db73a8c1699e77879ec8352c9fdb26067d4c1
 PERSISTENT_LOGIN_VERSION=bde7b6840c7d91de627ea14e81cf4133cbb3c07a # version 5.3
 HTML5_NOTIFIER_VERSION=68d9ca194212e15b3c7225eb6085dbcf02fd13d7 # version 0.6.4+
-CARDDAV_VERSION=4.4.3
-CARDDAV_HASH=74f8ba7aee33e78beb9de07f7f44b81f6071b644
+CARDDAV_VERSION=5.1.4
+CARDDAV_HASH=f6fb59edf292795ddab6697b44b83e6d05d5eb77
 
 UPDATE_KEY=$VERSION:$PERSISTENT_LOGIN_VERSION:$HTML5_NOTIFIER_VERSION:$CARDDAV_VERSION
 
@@ -49,6 +49,12 @@ UPDATE_KEY=$VERSION:$PERSISTENT_LOGIN_VERSION:$HTML5_NOTIFIER_VERSION:$CARDDAV_V
 RCM_DIR=/usr/local/lib/roundcubemail
 RCM_PLUGIN_DIR=${RCM_DIR}/plugins
 RCM_CONFIG=${RCM_DIR}/config/config.inc.php
+
+# >>> GESEIDL EDITION OVERLAY >>>
+# Read before replacing the application tree. Keep existing encrypted plugin
+# credentials and persistent-login cookies usable across a software upgrade.
+SECRET_KEY=$(python3 setup/geseidl_edition/roundcube_secret.py --config "$RCM_CONFIG" --php "php$PHP_VER") || exit 1
+# <<< GESEIDL EDITION OVERLAY <<<
 
 needs_update=0 #NODOC
 if [ ! -f /usr/local/lib/roundcubemail/version ]; then
@@ -106,7 +112,7 @@ cp -r conf/roundcube-plugins/dovecot_ident ${RCM_PLUGIN_DIR}/dovecot_ident
 
 # Generate a secret key of PHP-string-safe characters appropriate
 # for the cipher algorithm selected below.
-SECRET_KEY=$(dd if=/dev/urandom bs=1 count=32 2>/dev/null | base64 | sed s/=//g)
+# SECRET_KEY was preserved before replacing the installation, or created once.
 
 # Create a configuration file.
 #

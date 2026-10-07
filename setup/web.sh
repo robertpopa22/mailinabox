@@ -158,6 +158,10 @@ chown -R "$STORAGE_USER" "$STORAGE_ROOT/www"
 restart_service nginx
 restart_service php"$PHP_VER"-fpm
 
+# >>> GESEIDL EDITION OVERLAY >>>
+python3 setup/geseidl_edition/php_runtime.py --version "$PHP_VER"
+# <<< GESEIDL EDITION OVERLAY <<<
+
 # Open ports.
 ufw_allow http
 ufw_allow https

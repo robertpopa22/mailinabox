@@ -22,6 +22,9 @@
 | ID | Title | Category | Link |
 |----|-------|----------|------|
 | BP-MIAB-001 | Review release pins as well as the fork Git head | Updates | [Details](docs/bp/updates.md) |
+| BP-MIAB-005 | Validate major-version web roots and runtime backup coherence | Updates | [Details](docs/bp/latest-stable.md) |
+| BP-MIAB-006 | Maintain compatible authentication without changing user identities | Updates | [Details](docs/bp/latest-stable.md) |
+| BP-MIAB-007 | Preserve the webmail cipher key across software updates | Updates | [Details](docs/bp/latest-stable.md) |
 | BP-MIAB-002 | Isolate clone instance IDs and temporary state | Updates | [Details](docs/bp/updates.md#bp-miab-002--isolate-clone-instance-ids-and-temporary-state) |
 | BP-MIAB-003 | Set generated webmail config readability explicitly | Updates | [Details](docs/bp/updates.md#bp-miab-003--set-generated-webmail-config-readability-explicitly) |
 | BP-MIAB-004 | Report structured checks and complete grouped changes | Reporting | [Details](docs/bp/reporting.md) |

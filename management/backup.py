@@ -302,7 +302,10 @@ def perform_backup(full_backup):
 			if quit:
 				sys.exit(code)
 
-	service_command("php8.3-fpm", "stop", quit=True)
+	# >>> GESEIDL EDITION OVERLAY >>>
+	from geseidl_edition.php_runtime import php_fpm_service
+	service_command(php_fpm_service(env), "stop", quit=True)
+	# <<< GESEIDL EDITION OVERLAY <<<
 	service_command("postfix", "stop", quit=True)
 	service_command("dovecot", "stop", quit=True)
 	service_command("postgrey", "stop", quit=True)
@@ -340,7 +343,9 @@ def perform_backup(full_backup):
 		service_command("postgrey", "start", quit=False)
 		service_command("dovecot", "start", quit=False)
 		service_command("postfix", "start", quit=False)
-		service_command("php8.3-fpm", "start", quit=False)
+		# >>> GESEIDL EDITION OVERLAY >>>
+		service_command(php_fpm_service(env), "start", quit=False)
+		# <<< GESEIDL EDITION OVERLAY <<<
 
 	# Remove old backups. This deletes all backup data no longer needed
 	# from more than 3 days ago.
