@@ -52,7 +52,7 @@ def build(work, source_archive, baseline, maintainer):
         '--localstatedir=/var', '--with-zonesdir=/etc/nsd/zones',
         '--with-pidfile=/run/nsd/nsd.pid', '--with-xfrdfile=/var/lib/nsd/xfrd.state',
         '--with-zonelistfile=/var/lib/nsd/zone.list', '--with-user=nsd',
-        '--enable-systemd', '--with-ssl']
+        '--enable-systemd', '--with-ssl', '--disable-ratelimit-default-is-off']
     with (work / 'build.log').open('w') as log:
         for args in [options, ['make', '-j2']]:
             subprocess.run(args, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
@@ -71,7 +71,7 @@ def build(work, source_archive, baseline, maintainer):
         shutil.copytree(payload / tree, stage / tree, dirs_exist_ok=True)
     control_path = stage / 'DEBIAN/control'
     control = control_path.read_text()
-    release = VERSION + '+geseidl2'
+    release = VERSION + '+geseidl3'
     control = replace_field(control, 'Version', release)
     control = replace_field(control, 'Maintainer', maintainer)
     control = replace_field(control, 'X-Upstream-Source-SHA256', SOURCE_SHA256)

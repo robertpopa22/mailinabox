@@ -1,0 +1,20 @@
+From 2559a95ce65124f7a5ba00f991a8231cb9729ae6 Mon Sep 17 00:00:00 2001
+From: Robert Popa <robert.popa@geseidl.ro>
+Date: Wed, 7 Oct 2026 18:23:10 +0300
+Subject: [PATCH 2/2] build(dns): preserve shell line endings
+
+---
+ .gitattributes | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 .gitattributes
+
+diff --git a/.gitattributes b/.gitattributes
+new file mode 100644
+index 0000000..12ae727
+--- /dev/null
++++ b/.gitattributes
+@@ -0,0 +1 @@
++setup/dns.sh text eol=lf
+-- 
+2.55.0.windows.5
+

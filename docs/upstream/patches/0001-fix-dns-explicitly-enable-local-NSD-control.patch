@@ -1,0 +1,73 @@
+From c9e3e9cbc902b888ebdc6f00be7419fecd9b0c73 Mon Sep 17 00:00:00 2001
+From: Robert Popa <robert.popa@geseidl.ro>
+Date: Wed, 7 Oct 2026 18:20:49 +0300
+Subject: [PATCH 1/2] fix(dns): explicitly enable local NSD control
+
+---
+ setup/dns.sh                     |  9 +++++++++
+ tests/test_nsd_control_config.py | 33 ++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+ create mode 100644 tests/test_nsd_control_config.py
+
+diff --git a/setup/dns.sh b/setup/dns.sh
+index f2ad3a4..37fdf1a 100755
+--- a/setup/dns.sh
++++ b/setup/dns.sh
+@@ -50,6 +50,15 @@ done
+ # the zones.conf file written out by our management daemon.
+ echo "include: /etc/nsd/nsd.conf.d/*.conf" >> /etc/nsd/nsd.conf;
+ 
++# Management uses nsd-control to load generated zones. Some distribution
++# packages enable control by default, but upstream NSD does not. Configure
++# it explicitly and keep the control listener local to the appliance.
++cat >> /etc/nsd/nsd.conf << EOF;
++remote-control:
++  control-enable: yes
++  control-interface: 127.0.0.1
++EOF
++
+ # Remove the old location of zones.conf that we generate. It will
+ # now be stored in /etc/nsd/nsd.conf.d.
+ rm -f /etc/nsd/zones.conf
+diff --git a/tests/test_nsd_control_config.py b/tests/test_nsd_control_config.py
+new file mode 100644
+index 0000000..cce027c
+--- /dev/null
++++ b/tests/test_nsd_control_config.py
+@@ -0,0 +1,33 @@
++"""Validate the generated NSD control settings using the actual NSD parser."""
++import os
++from pathlib import Path
++import re
++import shlex
++import shutil
++import subprocess
++import tempfile
++import unittest
++
++
++class NsdControlConfigurationTests(unittest.TestCase):
++    def test_generated_template_enables_only_local_control(self):
++        checker = os.environ.get('NSD_CHECKCONF_BIN') or shutil.which('nsd-checkconf')
++        if not checker:
++            self.skipTest('NSD configuration parser is not installed')
++        source = (Path(__file__).parents[1] / 'setup/dns.sh').read_text()
++        initial = re.search(r'cat > /etc/nsd/nsd.conf << EOF;\n(.*?)\nEOF', source, re.S)
++        appended = re.findall(r'cat >> /etc/nsd/nsd.conf << EOF;\n(.*?)\nEOF', source, re.S)
++        self.assertIsNotNone(initial)
++        config = initial.group(1) + '\n' + '\n'.join(appended) + '\n'
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / 'nsd.conf'
++            path.write_text(config)
++            def option(name):
++                result = subprocess.check_output([checker, '-o', name, str(path)], text=True)
++                return shlex.split(result)
++            self.assertEqual(option('control-enable'), ['yes'])
++            self.assertEqual(option('control-interface'), ['127.0.0.1'])
++
++
++if __name__ == '__main__':
++    unittest.main()
+-- 
+2.55.0.windows.5
+
