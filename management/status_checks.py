@@ -956,16 +956,16 @@ def list_apt_updates(apt_update=True):
 	simulated_install = shell("check_output", ["/usr/bin/apt-get", "-qq", "-s", "upgrade"])
 	pkgs = []
 	for line in simulated_install.split('\n'):
-		if line.strip() == "":
+		# Only installation records describe packages to be updated. Other
+		# lines include configuration records, diagnostics and APT summaries.
+		if not line.startswith("Inst "):
 			continue
-		if re.match(r'^Conf .*', line):
-			 # remove these lines, not informative
-			continue
-		m = re.match(r'^Inst (.*) \[(.*)\] \((\S*)', line)
+		# Newly installed dependencies have no [current version] field.
+		m = re.match(r'^Inst (\S+)(?: \[([^]]*)\])? \((\S+)', line)
 		if m:
-			pkgs.append({ "package": m.group(1), "version": m.group(3), "current_version": m.group(2) })
+			pkgs.append({ "package": m.group(1), "version": m.group(3), "current_version": m.group(2) or "" })
 		else:
-			pkgs.append({ "package": "[" + line + "]", "version": "", "current_version": "" })
+			raise ValueError("Unrecognized APT installation record: " + line)
 
 	# Cache for future requests.
 	_apt_updates = (datetime.datetime.now(), pkgs)
