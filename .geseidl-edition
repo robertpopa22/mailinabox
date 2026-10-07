@@ -1,7 +1,8 @@
 # Geseidl Edition overlay manifest.
 # Prezenta acestui fisier = overlay activ. Vezi management/geseidl_edition/OVERLAY.md
 edition: geseidl
-overlay_version: 0.11.0
+overlay_version: 0.11.1
+# 0.11.1: configuratie OPcache proprie, fara dependenta de vechiul loader ini.
 # 0.11.0: NC35/PHP8.5/RC1.7, autentificare IMAP mentinuta de edition,
 # web root public_html, cipher key pastrat, backup pe FPM configurat.
 # 0.10.3: raport SMTP fara stdout/stderr brut, blocuri de schimbari consolidate,

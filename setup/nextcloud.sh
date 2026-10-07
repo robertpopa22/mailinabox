@@ -464,14 +464,9 @@ tools/editconf.py /etc/php/"$PHP_VER"/fpm/php.ini -c ';' \
 	short_open_tag=On
 
 # Set Nextcloud recommended opcache settings
-tools/editconf.py /etc/php/"$PHP_VER"/cli/conf.d/10-opcache.ini -c ';' \
-	opcache.enable=1 \
-	opcache.enable_cli=1 \
-	opcache.interned_strings_buffer=8 \
-	opcache.max_accelerated_files=10000 \
-	opcache.memory_consumption=128 \
-	opcache.save_comments=1 \
-	opcache.revalidate_freq=1
+# >>> GESEIDL EDITION OVERLAY >>>
+python3 setup/geseidl_edition/php_opcache.py --version "$PHP_VER" || exit 1
+# <<< GESEIDL EDITION OVERLAY <<<
 
 # Migrate users_external data from <0.6.0 to version 3.0.0
 # (see https://github.com/nextcloud/user_external).

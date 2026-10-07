@@ -13,6 +13,10 @@ Otherwise a backup may stop an obsolete idle runtime while application writers
 remain active. The marker falls back to the prior runtime until cutover and
 rejects malformed service names. Directive: MIAB-03, MIAB-07, MIAB-11.
 
+PHP package layouts also change: PHP 8.5 exposes OPcache without the previous
+`cli/conf.d/10-opcache.ini` loader file. Probe the capability, then create an
+edition-owned settings ini for CLI/FPM; do not assume a vendor loader path exists.
+
 ## BP-MIAB-006 — Preserve identities while maintaining authentication
 
 The stable upstream user_external 4.0.0 declaration stops at Nextcloud 34.
