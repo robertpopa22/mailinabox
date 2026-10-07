@@ -50,6 +50,15 @@ done
 # the zones.conf file written out by our management daemon.
 echo "include: /etc/nsd/nsd.conf.d/*.conf" >> /etc/nsd/nsd.conf;
 
+# Management uses nsd-control to load generated zones. Some distribution
+# packages enable control by default, but upstream NSD does not. Configure
+# it explicitly and keep the control listener local to the appliance.
+cat >> /etc/nsd/nsd.conf << EOF;
+remote-control:
+  control-enable: yes
+  control-interface: 127.0.0.1
+EOF
+
 # Remove the old location of zones.conf that we generate. It will
 # now be stored in /etc/nsd/nsd.conf.d.
 rm -f /etc/nsd/zones.conf
