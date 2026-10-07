@@ -27,6 +27,8 @@ class NsdControlConfigurationTests(unittest.TestCase):
                 return shlex.split(result)
             self.assertEqual(option('control-enable'), ['yes'])
             self.assertEqual(option('control-interface'), ['127.0.0.1'])
+            self.assertEqual(option('logfile'), [])
+            self.assertEqual(option('log-only-syslog'), ['yes'])
 
 
 if __name__ == '__main__':
