@@ -16,6 +16,9 @@ rejects malformed service names. Directive: MIAB-03, MIAB-07, MIAB-11.
 PHP package layouts also change: PHP 8.5 exposes OPcache without the previous
 `cli/conf.d/10-opcache.ini` loader file. Probe the capability, then create an
 edition-owned settings ini for CLI/FPM; do not assume a vendor loader path exists.
+Refresh managed Z-Push command wrappers even when the application version is
+unchanged: otherwise they can retain a removed PHP interpreter. Refuse to
+overwrite a custom wrapper and validate the selected interpreter before changing it.
 
 ## BP-MIAB-006 — Preserve identities while maintaining authentication
 

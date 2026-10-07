@@ -10,6 +10,7 @@ setup/webmail.sh                   text eol=lf
 setup/nextcloud.sh                 text eol=lf
 setup/functions.sh                 text eol=lf
 setup/web.sh                       text eol=lf
+setup/zpush.sh                     text eol=lf
 management/backup.py               text eol=lf
 setup/geseidl_edition/*.py          text eol=lf
 management/geseidl_edition/**/*.py text eol=lf
