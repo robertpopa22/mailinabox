@@ -448,6 +448,16 @@ sudo -u www-data php"$PHP_VER" /usr/local/lib/owncloud/occ upgrade
 E=$?
 if [ $E -ne 0 ] && [ $E -ne 3 ]; then exit 1; fi
 
+# >>> GESEIDL EDITION OVERLAY >>>
+# Historical app upgrades may record a migration without its SQLite table.
+# Restore only additive guarantees; never rebuild or discard populated tables.
+if [ -f "$STORAGE_ROOT/owncloud/owncloud.db" ]; then
+	sudo -u www-data python3 setup/geseidl_edition/nextcloud_sqlite.py \
+		--code /usr/local/lib/owncloud --database "$STORAGE_ROOT/owncloud/owncloud.db" \
+		--php "php$PHP_VER" || exit 1
+fi
+# <<< GESEIDL EDITION OVERLAY <<<
+
 # Disable default apps that we don't support
 sudo -u www-data \
 	php"$PHP_VER" /usr/local/lib/owncloud/occ app:disable photos dashboard activity \

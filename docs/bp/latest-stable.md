@@ -50,3 +50,15 @@ Primary references reviewed 2026-10-07:
 - [Upstream user_external 4.0.0](https://github.com/nextcloud/user_external/tree/v4.0.0)
 
 Deployment evidence and raw logs stay in the private operations repository/server.
+
+## BP-MIAB-008 — Validate schema guarantees without deleting historical data
+
+Successful app version upgrades and DAV login do not prove every migration table
+or uniqueness guarantee exists. Compare with a fresh installation on the same
+database engine. SQLite may represent UNIQUE constraints as unnamed automatic
+indexes; inspect the actual guarantee rather than adding duplicate indexes to
+silence the checker. Replay publisher DDL only for an absent table and restore
+the job-class and open-invite uniqueness indexes additively, in a transaction.
+Leave historical tables, disabled apps and populated-column differences visible
+until classified. Test data fingerprints, integrity and repeated application.
+Directive: MIAB-03, MIAB-07, MIAB-11.

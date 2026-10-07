@@ -10,6 +10,7 @@
 | Overlay zones `status`, `dns`, `ssl`, `mail`, `web`, `spam` | delivered | MIAB-01 | `.geseidl-edition` (`overlay_version`, `zones`) |
 | Upstream review ledger (`upstream_commit_reviews`) kept current with every upstream release | in progress | MIAB-02 | `.geseidl-edition:17-18`; `TODO.md` |
 | Track publisher latest stable releases independently of upstream, including major migrations and documented compatibility exceptions | in progress | MIAB-07, MIAB-11 | `CHARTER.md` §5 (2026-10-07); `TODO.md` |
+| Nextcloud 35.0.1, Roundcube 1.7.4 and PHP 8.5 with current Contacts/Calendar/CardDAV | delivered | MIAB-03, MIAB-07, MIAB-11 | `c381ef8`, `37bb6ab`; clone authentication/DAV CRUD/CardDAV sync and data recovery verified |
 | Move remaining inline fork edits (e.g. `setup/nextcloud.sh` chain, `setup/rspamd.sh`) behind overlay zones where practical | proposed | MIAB-01 | — |
 | Self-contained governance (charter, TODO, roadmap, BP index, coverage guard) | delivered | MIAB-09 | this repository, 2026-10-06 |
 | Standalone Nextcloud decoupled from the Mail-in-a-Box pin | proposed | Nextcloud support window | `TODO.md` |

@@ -10,6 +10,7 @@
 | BP-MIAB-005 | T/P | `tests/test_php_runtime.py`; validate Roundcube 1.7 `public_html` web root, PHP 8.5 authenticated clone endpoints, nginx syntax and configured FPM stop/start in backup. |
 | BP-MIAB-006 | P | `setup/geseidl_edition/nextcloud_compat.py` checks reviewed source hashes, builds a separately named app and preserves the guarded schema migration; NC 34→35 clone login, wrong-password rejection, DAV CRUD and original-data fingerprint comparison. |
 | BP-MIAB-007 | P | `setup/geseidl_edition/roundcube_secret.py` captures the existing validated key before code replacement; compare key fingerprints and authenticate webmail after installation. |
+| BP-MIAB-008 | T/P | `tests/test_nextcloud_sqlite.py`; additive transaction in `setup/geseidl_edition/nextcloud_sqlite.py`, native expected table DDL, fingerprint/integrity and clone replay. |
 | BP-MIAB-002 | P | A rehearsal config sets a unique `instanceid` and private `tempdirectory`; copied data/config paths alone do not isolate Nextcloud `FileSequence` locks. |
 | BP-MIAB-003 | P | `setup/webmail.sh` explicitly sets main/password config to root:www-data, 0640; verify reads and authenticated webmail access as the service user. |
 | BP-MIAB-004 | T | `tests/test_geseidl_reporting.py`: captured SMTP diagnostics and preserved failures; noncontiguous changes; new APT dependencies; held/unknown/reboot states; idempotent hook persistence. |
