@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 import pytest
 
@@ -21,6 +22,7 @@ def test_current_release_removes_only_deprecated_dh():
     assert module.cleaned(expected, '3.11.7') == expected
 
 
+@pytest.mark.skipif(os.name != 'posix' or os.geteuid() != 0, reason='Requires POSIX root ownership and modes')
 def test_native_metadata_link_becomes_read_only_copy(tmp_path):
     config = tmp_path / 'etc'
     share = tmp_path / 'share'
