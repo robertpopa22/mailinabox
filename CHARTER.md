@@ -1,6 +1,6 @@
 # Charter — Mail-in-a-Box, Geseidl Edition
 
-Version 1.1 · 2026-10-07 · Owner: Geseidl IT Solutions (maintainers of this fork)
+Version 1.2 · 2026-10-07 · Owner: Geseidl IT Solutions (maintainers of this fork)
 
 This charter is self-contained. It defines what this fork is, what it is not, and the
 directives (`MIAB-NN`) every change must respect. Day-to-day status lives in `TODO.md` and
@@ -33,7 +33,7 @@ change that belongs upstream and should be sent there instead.
 | ID | Directive |
 |----|-----------|
 | MIAB-01 | **Overlay zones.** Edition-specific logic lives only under `management/geseidl_edition/` and `setup/geseidl_edition/`. Hooks inside upstream files are limited to blocks delimited by `# >>> GESEIDL EDITION OVERLAY >>>` / `# <<< GESEIDL EDITION OVERLAY <<<` and contain no logic beyond a call into the overlay. |
-| MIAB-02 | **Cherry-pick policy.** Upstream is a reference remote, not a merge source. Every upstream commit is reviewed once and recorded in `.geseidl-edition` (`upstream_commit_reviews`, `upstream_review_summary`) with a verdict: applied, already covered, not applicable, or tag-only. Security fixes are triaged first. A divergent Git graph is never reported as "up to date". |
+| MIAB-02 | **Reviewed upstream integration.** Keep the upstream remote and review upstream changes regularly. Upstream is a reference and contribution target, not a source of automatic production merges. Every reviewed upstream commit is recorded in `.geseidl-edition` (`upstream_commit_reviews`, `upstream_review_summary`) with a verdict: applied, already covered, not applicable, or tag-only. Security fixes are triaged first. A divergent Git graph is never reported as "up to date". |
 | MIAB-03 | **Idempotent, reversible overlay.** Every applier can be re-run safely, supports a dry-run or status mode, and verifies its result; provisioning steps that can break service roll back automatically when verification fails. |
 | MIAB-04 | **No deployment data in the repository.** No secrets, tokens, private addresses, real hostnames, SSH key names, client or user names, or filesystem paths of any private environment. Examples use `example.com`, `example.org` and the documentation ranges `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`. Deployment values are read from the environment or from files on the server. |
 | MIAB-05 | **Fail closed on configuration.** Features that need a deployment value (allowed networks, report mailbox, notification address) refuse to act, or skip with a clear log line, when the value is missing; they never fall back to a hardcoded production value. |
@@ -43,6 +43,7 @@ change that belongs upstream and should be sent there instead.
 | MIAB-09 | **Lessons become evidence.** A confirmed bug, regression or incident produces a `BP-MIAB-NNN` entry in `BEST_PRACTICES.md` and a row in `docs/TRACEABILITY.md`; `scripts/check_bp_coverage.py` must pass before commit. A lesson that demands a new rule becomes a directive here, with a new ID (IDs are never reused). |
 | MIAB-10 | **Branding.** The public README keeps the "Maintained by" section and the makeitcount footer. |
 | MIAB-11 | **Always latest stable, independently of upstream.** This fork targets and maintains each component's latest publisher-declared stable release, including new major versions, independently of Mail-in-a-Box upstream. Compatibility problems are maintenance work we resolve in the fork through reviewed adaptations and regression tests, rather than a permanent reason to retain an older major. Record installed and global latest versions, source/date and migration evidence. Use supported version hops; validate runtime, authentication, plugins, data and recovery on an isolated clone before production. An untested version override is not a compatibility fix. Any temporary blocker remains open with an owner and next action until resolved; never report an older maintenance branch as latest global. Distribution packages and kernel tracks retain an explicit lifecycle choice; maintained backports and upstream version numbers are reported separately. |
+| MIAB-12 | **Contribute upstream and retain a separate edition.** Design general fixes as small independent commits compatible with upstream conventions, supported defaults and licensing. Prepare contribution branches against an exact upstream commit and test them without the Geseidl marker/package; no deployment data or edition policy may be required. Keep edition-specific policies and optional component release channels in the separate Geseidl overlay. A contribution branch is a review artifact, not the old per-customisation deployment model. Record prepared/submitted/accepted status accurately; when upstream accepts an equivalent fix, retire the duplicate local implementation after regression tests. Preserve the upstream relationship without imposing the fork's production choices on upstream. |
 
 ## 4. Document roles
 
@@ -59,6 +60,7 @@ change that belongs upstream and should be sent there instead.
 
 | Date | Decision | Directive |
 |------|----------|-----------|
+| 2026-10-07 | Keep an active upstream relationship: portable fixes with independent tests, exact upstream contribution bases and a separate optional Geseidl edition package. | MIAB-02, MIAB-12 |
 | 2026-10-07 | The sovereign fork always targets latest publisher stable, including major releases. Resolve compatibility in the fork, prove migrations and recovery, then deploy; temporary blockers are unfinished maintenance work. | MIAB-11 |
 | 2026-06-09 | The fork becomes sovereign: no more `git merge upstream/main`; selective cherry-pick only; OS, Nextcloud and PHP versions are decided by this fork. | MIAB-02 |
 | 2026-06-09 | Customisation model is overlay zones, not feature branches. | MIAB-01 |

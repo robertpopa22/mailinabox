@@ -1,8 +1,11 @@
 # Geseidl Edition — Overlay Framework
 
 > Customizările Geseidl pentru Mail-in-a-Box, ca **addon (overlay)** peste un upstream curat.
-> Scop: rămânem 100% aliniați cu `upstream/main`, iar tot ce e Geseidl trăiește în pachete
-> separate aplicate peste, grupate pe zone. La fiecare upgrade upstream: `git pull` + re-aplicare overlay.
+> Scop: păstrăm codul upstream recognoscibil și relația de contribuție activă. Forkul are
+> diferențe deliberate și nu pretinde aliniere100%. Integrăm schimbări upstream evaluate,
+> testăm, apoi reaplicăm overlay-ul; fără pull/merge global automat în producție.
+> Corecțiile generale se pregătesc separat pentru upstream, fără dependență de edition.
+> Politicile locale și canalele opționale de versiuni rămân în pachetul Geseidl (MIAB-12).
 
 ---
 

@@ -22,13 +22,19 @@ Every change in this fork was developed because we needed it in production. If y
 
 ## Why we forked
 
-Mail-in-a-Box upstream is excellent for what it sets out to be: a one-click, opinionated mail server appliance. But "one-click" deliberately limits what you can customise. We needed three things upstream wouldn't add (and rightly so — it's not their goal):
+Mail-in-a-Box upstream provides a one-click, opinionated mail server appliance.
+The separate Geseidl edition adds three capabilities needed by our deployments:
 
 1. **A modern spam filter (rspamd)** to replace SpamAssassin, with neural network training, brand-impersonation detection tuned for the Romanian market, and Bayes auto-retraining from the user's Trash folder.
 2. **Operational reality fixes** — running MiaB behind NAT, with external DNS managed elsewhere, with a dedicated mail-archive account that BCCs all traffic.
 3. **Long-lived OS support** — clean in-place upgrades when Ubuntu LTS ages out, without rebuilding the VM from scratch.
 
-We maintain everything in branches so we can rebase onto upstream releases (currently aligned with **v75**, April 2026). When upstream ships, we follow within days.
+We retain an active relationship with upstream: review its changes, integrate
+applicable fixes and prepare small, independently tested contributions. Edition
+policies live in the separate Geseidl overlay; publisher release versions can
+advance independently after migration tests. The reviewed upstream reference is
+v77 (October 2026), while our historical baseline is v75. The Git histories are
+deliberately different. See [the contribution ledger](docs/upstream/CONTRIBUTIONS.md).
 
 ---
 
@@ -98,15 +104,17 @@ We documented every step, every issue we hit, every fix we applied. We also wrot
 
 | Branch / Tag | Purpose |
 |---|---|
-| `main` | **Default branch. Production-deploy.** v75 + rspamd + all Geseidl fixes. Use this. |
-| `upstream-mirror` | Sync of `mail-in-a-box/mailinabox` upstream `main` (currently v75). Used as rebase reference when upstream ships new releases. |
+| `main` | **Default branch.** Reviewed component upgrades and the separate Geseidl edition overlay. |
+| `codex/upstream-*` | Small contribution candidates based directly on an exact upstream commit; no edition dependency. |
+| `upstream/main` (remote reference) | Current upstream reference, fetched and reviewed before selective integration. |
 | `geseidl-v75-2204to2404-validated` (tag) | Snapshot of the exact code that survived our 22.04 → 24.04 upgrade |
 | `geseidl-v75-2026-04-30` (tag) | Snapshot of the rebased-on-v75 baseline pre-upgrade |
 | `feature/rspamd-spam-filter` | Original rspamd integration branch (v74-base, kept for history) |
 | `feature/*`, `fix/*` | Individual feature/fix branches (most folded into `main`) |
 | `backup/mail02-pre-upgrade-2026-04-30` | Manifest + SHA256 of the production config tarball pre-upgrade (tarball NOT in git — contains private keys) |
 
-If you want to track us, watch this repo and follow `main` (default). It rebases onto upstream tags as they ship.
+Follow `main` for the edition. Contribution branches are review artifacts; their
+existence does not mean a pull request has been submitted or accepted upstream.
 
 ---
 
@@ -139,16 +147,17 @@ For an existing MiaB on Ubuntu 22.04 who wants to upgrade to 24.04 LTS, **read [
 
 This fork is maintained by Robert Popa and the Geseidl IT Solutions team. We:
 
-- **Rebase onto upstream tags within a week** of upstream stable releases
-- **Test in our own production** before tagging any branch as stable
-- **Backport security fixes** from upstream as they land
+- **Review upstream releases and security changes**, recording integration decisions
+- **Test changes on isolated clones before production** and retain recovery evidence
+- **Prepare portable fixes for upstream**, without requiring our edition or policies
+- **Maintain edition policies separately** and retire duplicates after upstream adoption
 - **Open issues against this fork** for problems you encounter — we read them
 - **Accept pull requests** if they improve the fork without diverging from our production needs
 
 We do **not**:
 
 - Provide free email support (post issues on this repo or on the [upstream forum](https://discourse.mailinabox.email/))
-- Promise feature parity with upstream's release cadence — we follow, we don't lead
+- Promise identical release cadence or automatic merges; component stable versions are assessed independently
 - Maintain fork-only documentation in multiple languages — English only, except for `UPGRADE_PLAN_*.md` files which are operational notes for our team
 
 ---

@@ -26,6 +26,7 @@
 | BP-MIAB-006 | Maintain compatible authentication without changing user identities | Updates | [Details](docs/bp/latest-stable.md) |
 | BP-MIAB-007 | Preserve the webmail cipher key across software updates | Updates | [Details](docs/bp/latest-stable.md) |
 | BP-MIAB-008 | Validate additive SQLite schema guarantees | Updates | [Details](docs/bp/latest-stable.md) |
+| BP-MIAB-009 | Prove upstream portability without the edition | Contributions | [Details](docs/bp/upstream.md) |
 | BP-MIAB-002 | Isolate clone instance IDs and temporary state | Updates | [Details](docs/bp/updates.md#bp-miab-002--isolate-clone-instance-ids-and-temporary-state) |
 | BP-MIAB-003 | Set generated webmail config readability explicitly | Updates | [Details](docs/bp/updates.md#bp-miab-003--set-generated-webmail-config-readability-explicitly) |
 | BP-MIAB-004 | Report structured checks and complete grouped changes | Reporting | [Details](docs/bp/reporting.md) |
