@@ -1,6 +1,6 @@
 # Charter — Mail-in-a-Box, Geseidl Edition
 
-Version 1.0 · 2026-10-06 · Owner: Geseidl IT Solutions (maintainers of this fork)
+Version 1.1 · 2026-10-07 · Owner: Geseidl IT Solutions (maintainers of this fork)
 
 This charter is self-contained. It defines what this fork is, what it is not, and the
 directives (`MIAB-NN`) every change must respect. Day-to-day status lives in `TODO.md` and
@@ -42,6 +42,7 @@ change that belongs upstream and should be sent there instead.
 | MIAB-08 | **Line endings.** Artefacts executed on Linux (`*.sh`, `*.patch`, overlay Python) are forced to LF through `.gitattributes`. |
 | MIAB-09 | **Lessons become evidence.** A confirmed bug, regression or incident produces a `BP-MIAB-NNN` entry in `BEST_PRACTICES.md` and a row in `docs/TRACEABILITY.md`; `scripts/check_bp_coverage.py` must pass before commit. A lesson that demands a new rule becomes a directive here, with a new ID (IDs are never reused). |
 | MIAB-10 | **Branding.** The public README keeps the "Maintained by" section and the makeitcount footer. |
+| MIAB-11 | **Independent latest stable.** Track each component's latest publisher-declared stable release, including new major versions, independently of Mail-in-a-Box upstream. Record the installed version, global latest stable, tested compatible target, source/date, and any evidence-backed blocker; the newest patch on an older branch is never labelled global latest. Migrations follow supported version hops and validate runtime, authentication, plugins and data on an isolated clone before production. A blocker becomes an explicit exception and migration task, never a forced compatibility override. Distribution packages and kernel tracks have a separately documented lifecycle choice; maintained backports and upstream version numbers are reported separately. |
 
 ## 4. Document roles
 
@@ -58,6 +59,7 @@ change that belongs upstream and should be sent there instead.
 
 | Date | Decision | Directive |
 |------|----------|-----------|
+| 2026-10-07 | Track publisher latest stable versions independently of upstream, including major releases; document compatibility exceptions and validate migrations before deployment. | MIAB-11 |
 | 2026-06-09 | The fork becomes sovereign: no more `git merge upstream/main`; selective cherry-pick only; OS, Nextcloud and PHP versions are decided by this fork. | MIAB-02 |
 | 2026-06-09 | Customisation model is overlay zones, not feature branches. | MIAB-01 |
 | 2026-10-06 | Public repository is separated from any private deployment: deployment data removed, self-contained governance added. | MIAB-04, MIAB-05 |

@@ -4,9 +4,9 @@
 - Context: the fork was synchronized while its application pins still lagged behind supported maintenance releases.
 - Mistake: interpreting a current fork commit as evidence that every component is current.
 - Cause: OS packages, fork commits and downloaded application releases have separate update paths.
-- Correct: inspect upstream changes individually, verify the publisher's supported maintenance release and checksum, compare against the installed version, and test migrations on copied code/configuration/databases before production. Keep the current supported major line unless a major migration is separately intended. Pin Linux script line endings to LF and run `bash -n` on the exact transferred bytes before execution.
+- Correct: inspect upstream changes individually, verify the publisher's latest stable release and checksum independently of upstream (MIAB-11), compare against the installed version, and test migrations on copied code/configuration/databases before production. Include major releases in the target inventory; document any compatibility blocker and the supported migration hops. A temporary maintenance-branch update does not satisfy the global latest-stable target. Pin Linux script line endings to LF and run `bash -n` on the exact transferred bytes before execution.
 - Proof: Roundcube `1.6.19` pin/hash ported from upstream `d317da1`; Nextcloud `33.0.9` archive verified with the publisher's SHA256 before recording its SHA1 pin. Application upgrade rehearsals use isolated database copies. Deployment-specific results stay outside this public repository.
-- Directive: MIAB-02, MIAB-04, MIAB-07.
+- Directive: MIAB-02, MIAB-04, MIAB-07, MIAB-11.
 
 Sources checked 2026-10-07:
 - [Roundcube security release](https://roundcube.net/news/2026/09/06/security-updates-1.6.19-and-1.7.4).

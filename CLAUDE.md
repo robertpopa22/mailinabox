@@ -7,6 +7,7 @@
 > **Plecăm pe cont propriu.** `main` (robertpopa22/mailinabox) e **baseline-ul AUTORITATIV Geseidl**, NU o oglindă a upstream.
 
 - **NU mai facem `git merge upstream/main`.** Upstream (`mail-in-a-box/mailinabox`) devine doar un **remote de referință** din care **cherry-pick selectiv** (fix-uri securitate, features utile), evaluat manual caz-cu-caz.
+- **Latest stable independent de upstream:** aplică [MIAB-11 din CHARTER.md](CHARTER.md). Verifică direct editorul fiecărei componente, inclusiv versiunile majore; înregistrează explicit orice blocaj de compatibilitate și migrarea necesară.
 - **Eliberați de constrângerile upstream:** OS (Ubuntu 24.04+), Nextcloud (versiune **suportată**), PHP (8.2/8.3) — le decidem NOI, pe ritmul nostru. Upstream rămâne deliberat blocat pe 22.04 / NC 26 / PHP 8.0; noi NU.
 - **Implicație (responsabilitate):** preluăm 100% mentenanța + securitatea — nu mai vine "gratis" de la upstream. De aici **governance strict obligatoriu**: preflight propriu, verificări post-change, runbook-uri (vezi secțiunile de jos).
 - **Overlay-ul `geseidl_edition/` rămâne** ca igienă (customizări modulare, izolate), dar scopul se mută de la "minimizează conflicte la merge upstream" → "ține codul nostru separat de codul moștenit din upstream".
@@ -19,6 +20,8 @@
 ---
 
 ## Overview
+
+Secțiunile operaționale datate de mai jos păstrează istoricul din iunie 2026. Pinurile curente ale forkului se verifică în `setup/*.sh`; starea instalată și auditul MIAB-11 se păstrează în documentația privată a deploymentului (MIAB-04).
 
 Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspamd, arhivare email).
 
@@ -48,13 +51,16 @@ Fork Mail-in-a-Box cu customizări pentru mediul Geseidl (NAT, DNS extern, rspam
 | **web** | webmail per-domeniu `mail.<domeniu>/mail/` + branding HTTP_HOST, patch-uri idempotente | provisioning | v0.6.0 |
 | **spam** | rspamd: fisiere fork-tracked (`setup/rspamd.sh` 446l + UI `system-spam.html`) + 4 patch-uri integrare (mail-postfix/spamassassin/daemon-api/index), signature-gate, dry-run+revert | provisioning + runtime | v0.8.0 |
 
-**Workflow upgrade upstream** (cand OS-ul permite setup — vezi blocaj 24.04 mai jos):
+**Workflow review upstream** (MIAB-02; fără merge global):
 ```bash
-git fetch upstream && git merge upstream/main                    # conflicte doar pe blocuri marcate GESEIDL (mici)
+git fetch upstream                                              # sursă de referință
+# Revizuiește fiecare commit; înregistrează verdictul în .geseidl-edition.
+# Preia numai schimbările aprobate, prin cherry-pick sau adaptare documentată.
 python3 management/geseidl_edition/apply_overlay.py apply         # reinsereaza hook-uri runtime (idempotent)
 sudo bash setup/geseidl_edition/apply_setup_overlay.sh           # reaplica zone provisioning (idempotent)
 sudo systemctl restart mailinabox
 ```
+Înainte de orice aplicare în producție, testează pe clonă componentele atinse. Auditul versiunilor stabile ale editorilor este separat de review-ul upstream.
 `apply_overlay.py {status|apply|remove|selftest}`. Marker = `# >>> GESEIDL EDITION OVERLAY >>>` / `# <<< ... <<<`. Logica reala traieste EXCLUSIV in `geseidl_edition/`, niciodata in corpul functiilor upstream.
 
 ---
