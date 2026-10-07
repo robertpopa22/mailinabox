@@ -55,7 +55,8 @@ def convert(text, sql, private, storage_version='2.3.21'):
     if set(sql) != {'driver', 'connect', 'default_pass_scheme', 'password_query', 'user_query', 'iterate_query'}:
         raise ValueError('Unreviewed SQL configuration settings')
     tree = parse(text)
-    lines = ['dovecot_config_version = 2.4.5', 'dovecot_storage_version = ' + storage_version, 'auth_allow_cleartext = no']
+    lines = ['dovecot_config_version = 2.4.5', 'dovecot_storage_version = ' + storage_version,
+        'auth_allow_cleartext = no', 'sieve_max_cpu_time = 30s']
     def emit(key, value, depth=0):
         lines.append('  ' * depth + key + ' = ' + json.dumps(variables(value)))
     def begin(name, depth=0):

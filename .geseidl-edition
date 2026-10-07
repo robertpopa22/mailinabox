@@ -1,7 +1,8 @@
 # Geseidl Edition overlay manifest.
 # Prezenta acestui fisier = overlay activ. Vezi management/geseidl_edition/OVERLAY.md
 edition: geseidl
-overlay_version: 0.13.0
+overlay_version: 0.13.1
+# 0.13.1: limita CPU Sieve MDA/IMAP explicita conform publisher2.4.5, fara default legacy0.
 # 0.13.0: adaptor Dovecot2.4 SQL/Maildir/Sieve, profil privat verificat si setup version-aware.
 # 0.12.1: canal ISC BIND optional si pastrarea zonelor standard la schimbarea originii.
 # 0.12.0: contributii upstream independente, NSD publisher package optional,

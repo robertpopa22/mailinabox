@@ -56,6 +56,7 @@ def test_preserves_authentication_network_policy_quotas_and_storage_recovery():
     output = module.convert(CONFIG, SQL, PRIVATE)
     assert 'dovecot_storage_version = 2.3.21' in output
     assert 'dovecot_config_version = 2.4.5' in output
+    assert 'sieve_max_cpu_time = 30s' in output
     assert 'request.remote = "%{remote_ip}"' in output
     assert 'request.protocol = "%{protocol}"' in output
     assert 'delivery = "no"' in output
