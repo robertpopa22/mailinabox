@@ -19,6 +19,30 @@ def cleaned(text, version):
                   '', text, flags=re.M)
 
 
+def regularize_metadata(config_directory=Path('/etc/postfix'), share_directory=Path('/usr/share/postfix')):
+    metadata = config_directory / 'makedefs.out'
+    if not metadata.is_symlink():
+        return False
+    source = share_directory / 'makedefs.out'
+    if source.is_symlink() or metadata.resolve() != source.resolve():
+        raise ValueError('Refusing a non-native metadata link')
+    info = source.stat()
+    if info.st_uid != 0 or info.st_mode & 0o022:
+        raise ValueError('Expected protected native metadata')
+    contents = source.read_bytes()
+    with tempfile.NamedTemporaryFile(prefix='.postfix-metadata-', dir=config_directory, delete=False) as stream:
+        candidate = Path(stream.name)
+        stream.write(contents)
+    try:
+        candidate.chmod(0o644)
+        os.replace(candidate, metadata)
+    finally:
+        candidate.unlink(missing_ok=True)
+    if metadata.read_bytes() != contents:
+        raise RuntimeError('Native metadata content changed')
+    return True
+
+
 def reconcile(apply=False, config=Path('/etc/postfix/main.cf')):
     version = subprocess.check_output(['postconf', '-h', 'mail_version'],
         text=True, stderr=subprocess.PIPE).strip()
@@ -38,7 +62,10 @@ def reconcile(apply=False, config=Path('/etc/postfix/main.cf')):
             os.chown(candidate, info.st_uid, info.st_gid)
             candidate.chmod(info.st_mode & 0o777)
             os.replace(candidate, config)
+    current = tuple(map(int, re.match(r'^(\d+)\.(\d+)\.', version).groups())) >= (3, 9)
+    regularized = regularize_metadata(config.parent) if apply and current else False
     result = {'version': version, 'changed': before != after,
+              'native_metadata_regularized': regularized,
               'applied': apply, 'tls_certificates_unchanged': True}
     print(json.dumps(result))
 
