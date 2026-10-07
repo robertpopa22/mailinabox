@@ -22,7 +22,9 @@ cat > /etc/nsd/nsd.conf << EOF;
 # Do not edit. Overwritten by Mail-in-a-Box setup.
 server:
   hide-version: yes
-  logfile: "/var/log/nsd.log"
+  # Use syslog/journal; the hardened service cannot write arbitrary /var/log files.
+  logfile: ""
+  log-only-syslog: yes
 
   # identify the server (CH TXT ID.SERVER entry).
   identity: ""

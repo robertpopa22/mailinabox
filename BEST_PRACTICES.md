@@ -34,6 +34,8 @@
 | BP-MIAB-014 | Preserve package boundaries and symlink safety | Packaging | [Details](docs/bp/service-packages.md) |
 | BP-MIAB-015 | Test read-only SQLite consumers after a cold restart | Packaging | [Details](docs/bp/service-packages.md) |
 | BP-MIAB-016 | Preserve listener scope and verify actual protocol methods | Packaging | [Details](docs/bp/service-packages.md) |
+| BP-MIAB-017 | Isolate native service directory lifecycle | Packaging | [Details](docs/bp/service-packages.md) |
+| BP-MIAB-018 | Prove cross-version persistence and numeric semantics | Packaging | [Details](docs/bp/service-packages.md) |
 | BP-MIAB-002 | Isolate clone instance IDs and temporary state | Updates | [Details](docs/bp/updates.md#bp-miab-002--isolate-clone-instance-ids-and-temporary-state) |
 | BP-MIAB-003 | Set generated webmail config readability explicitly | Updates | [Details](docs/bp/updates.md#bp-miab-003--set-generated-webmail-config-readability-explicitly) |
 | BP-MIAB-004 | Report structured checks and complete grouped changes | Reporting | [Details](docs/bp/reporting.md) |

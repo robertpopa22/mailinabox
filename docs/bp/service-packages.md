@@ -85,6 +85,41 @@ Prove new-version cold startup, old-version delivery of newly queued mail and
 content preservation. Keep any unresolved mode or recovery limitation visible.
 Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.
 
+## BP-MIAB-017 — Isolate native service directory lifecycle
+
+Network and mount namespaces do not isolate systemd's host-side handling of
+RuntimeDirectory and StateDirectory. A copied unit retaining the production
+directory name can remove the production control socket when its fixture stops.
+Override these names with unique fixture directories, bind only the private
+runtime/state and verify the original live socket inode and a functioning control
+request after cleanup. Preserve native hardening independently of this override.
+
+Ban commands and jail startup do not prove completed kernel enforcement. Test
+an allowed source and a banned source with actual connections in the private
+network; inspect the effective backend, which may change between vendor releases.
+Wait for asynchronous restoration before comparing persisted bans. Socket
+activation needs stop/restart proof as well as initial startup: shutdown of an
+inherited FD can invalidate the original systemd listener.
+Directive: MIAB-03, MIAB-07, MIAB-11.
+
+## BP-MIAB-018 — Prove cross-version persistence and numeric semantics
+
+A newer binary can write an RDB format the recovery binary cannot read. Prepare
+plain-command AOF on the running old Redis, wait for successful rewrite and
+verify the base file before persisting configuration or replacing packages.
+Setting appendonly in an offline config alone does not create a complete journal.
+Keep current AOF/new writes during recovery; never restore an old snapshot over
+new activity. The tested workload uses existing core data types, without newly
+introduced commands/types that the recovery binary cannot interpret.
+
+Compare each type's logical values and absolute expiration times. Floating-point
+score text can change between versions while the IEEE754 value remains exactly
+the same; normalize to exact hexadecimal representation, with no rounding or
+tolerance. Keep all other byte comparisons strict. Report short-lived keys
+excluded by an explicit fixed deadline separately. A built-in vectorset entry
+in MODULE LIST is distinct from loading external optional module libraries.
+Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.
+
 ## BP-MIAB-016 — Preserve listener scope and verify actual protocol methods
 
 nginx 1.25.1 introduced the server-level HTTP/2 directive. Converting a legacy

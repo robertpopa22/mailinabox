@@ -1,7 +1,8 @@
 # Geseidl Edition overlay manifest.
 # Prezenta acestui fisier = overlay activ. Vezi management/geseidl_edition/OVERLAY.md
 edition: geseidl
-overlay_version: 0.15.0
+overlay_version: 0.16.0
+# 0.16.0: Redis/F2b publisher optionale, AOF/recovery explicit si logging NSD nativ.
 # 0.15.0: canal nginxstable oficial optional si HTTP2 version-aware cu scope pastrat.
 # 0.14.1: metadata Ubuntu byte-identica regularizata pentru checkperm publisher.
 # 0.14.0: pachete Postfix publisher optionale, TLS actual si recovery coada/SQLite.

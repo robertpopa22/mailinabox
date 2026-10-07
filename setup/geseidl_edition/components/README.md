@@ -145,3 +145,58 @@ old-binary recovery and nominal application access after installation.
 
 Sources: [official package channel](https://nginx.org/en/linux_packages.html),
 [HTTP/2 directive](https://nginx.org/en/docs/http/ngx_http_v2_module.html).
+
+## Optional Redis publisher channel and recovery preparation
+
+`redis_channel.py` stages the reviewed server/tools pair from signed publisher
+metadata; enable the Ubuntu 24.04 Signed-By channel separately after acceptance.
+Only those two packages receive priority 600; other packages from that origin are
+excluded. The channel does not install packages or migrate data.
+
+Before replacement, `redis_aof.py --prepare-recovery` operates on the running
+loopback Redis, creates a complete plain-command AOF and waits for successful
+rewrite before saving configuration. It keeps every-second fsync and the existing
+RDB snapshots. Test the old binary against the new AOF with new writes retained;
+this contract covers the existing core data types, not newly introduced commands
+or module types. Do not switch appendonly by editing an offline config alone.
+Never restore an old RDB over subsequent activity.
+
+`redis_service.py --preserve-service` captures the reviewed distribution service
+as a drop-in before changing package origin, keeping startup arguments and
+hardening. Review this profile on future service changes. Keep existing Redis
+configuration and listener scope. Publisher 8.10 includes the in-tree vectorset
+component; external Bloom/Search/JSON/TimeSeries libraries are not loaded by this
+migration. Preserve that distinction when reporting MODULE LIST.
+
+Acceptance compares typed values and absolute expiry times on isolated copies,
+using exact IEEE754 zset scores rather than their version-dependent text format.
+Report short-lived exclusions explicitly. Stop SMTP and its filter together for
+the bounded replacement so an unavailable filter cannot create an accept bypass;
+verify real mail/application access after reopening.
+
+Sources: [publisher APT channel](https://redis.io/docs/latest/operate/oss_and_stack/install/install-stack/apt/),
+[persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/),
+[in-tree modules](https://github.com/redis/redis/blob/8.10.2/modules/MODULES.md).
+
+## Optional Fail2ban publisher asset
+
+`fail2ban_package.py` stages a specifically reviewed stable GitHub release asset,
+checking its API SHA256, official HTTPS URL and exact Debian version/architecture.
+This is distinct from PGP verification; no such claim is made. Release 1.1.1 uses
+the corrected `upstream2` asset, whose Debian version contains `~upstream2`.
+Installation, local configuration preservation and recovery remain operator steps.
+
+Test all enabled jails, actual healthy/failed authentication logs and both allowed
+and refused network connections in a private kernel firewall. Preserve the ban
+database, new bans and original timestamps across old-version recovery. Keep the
+current Dovecot 2.4-compatible filter when recovering an older Fail2ban binary.
+Account for asynchronous restoration before comparing active bans.
+
+Native service fixtures must use their own RuntimeDirectory/StateDirectory names
+and prove the live control socket still exists and responds after cleanup. Test
+socket activation through stop/restart: the 1.1.1 publisher listener showed
+POLLHUP when the daemon shut down its inherited FD. The validated deployment uses
+the traditional native daemon-owned control socket, with optional socket
+activation disabled in both systemd and package-helper state.
+
+Source: [Fail2ban publisher releases](https://github.com/fail2ban/fail2ban/releases).
