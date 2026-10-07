@@ -47,7 +47,8 @@ def build(work, source_archive, baseline, maintainer):
     with tarfile.open(source_archive) as archive:
         archive.extractall(work, filter='data')
     source = work / ('nsd-' + VERSION)
-    options = ['./configure', '--prefix=/usr', '--sysconfdir=/etc/nsd',
+    # NSD appends /nsd to sysconfdir itself; /etc/nsd would duplicate it.
+    options = ['./configure', '--prefix=/usr', '--sysconfdir=/etc',
         '--localstatedir=/var', '--with-zonesdir=/etc/nsd/zones',
         '--with-pidfile=/run/nsd/nsd.pid', '--with-xfrdfile=/var/lib/nsd/xfrd.state',
         '--with-zonelistfile=/var/lib/nsd/zone.list', '--with-user=nsd',
@@ -55,6 +56,9 @@ def build(work, source_archive, baseline, maintainer):
     with (work / 'build.log').open('w') as log:
         for args in [options, ['make', '-j2']]:
             subprocess.run(args, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
+    if not re.search(r'^#define CONFIGFILE "/etc/nsd/nsd\.conf"$',
+                     (source / 'config.h').read_text(), re.M):
+        raise RuntimeError('Compiled default configuration path does not match the native service')
     stage = work / 'native-package'
     subprocess.run(['dpkg-deb', '--raw-extract', str(baseline), str(stage)], check=True)
     payload = work / 'new-payload'
@@ -67,7 +71,7 @@ def build(work, source_archive, baseline, maintainer):
         shutil.copytree(payload / tree, stage / tree, dirs_exist_ok=True)
     control_path = stage / 'DEBIAN/control'
     control = control_path.read_text()
-    release = VERSION + '+geseidl1'
+    release = VERSION + '+geseidl2'
     control = replace_field(control, 'Version', release)
     control = replace_field(control, 'Maintainer', maintainer)
     control = replace_field(control, 'X-Upstream-Source-SHA256', SOURCE_SHA256)

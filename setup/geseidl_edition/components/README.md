@@ -17,7 +17,7 @@ the live configuration read-only. Retain the authenticated old package and prove
 recovery. Version-sensitive state formats and service sandbox restrictions must
 be checked; a private build prefix passing a query is insufficient.
 
-The resulting `nsd_4.15.2+geseidl1_*.deb` is a local release-channel artifact,
+The resulting `nsd_4.15.2+geseidl2_*.deb` is a local release-channel artifact,
 not an official NLnet Labs or Ubuntu package. Its manifest records source, native
 baseline and artifact hashes. Artifacts and environment values remain outside
 this public source repository. Future releases require refreshed pins and tests;
