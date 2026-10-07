@@ -56,3 +56,31 @@ Keep UIDVALIDITY/UIDs and verify Sieve/auth/quotas after recovery. A Sieve edito
 accepting a literal redirect does not imply execution is allowed; test runtime
 prohibition, local keep and an empty isolated outbound queue.
 Directive: MIAB-03, MIAB-05, MIAB-07, MIAB-11, MIAB-12.
+
+## BP-MIAB-014 — Preserve package boundaries and symlink safety
+
+Native packages can contain absolute symlinks. A build that copies through one
+can overwrite the host rather than its staging tree. Refuse symlinked parents
+and replace destination links safely. Build all executable/shared-library/plugin
+ABI from one publisher source and preserve native service/maintainer integration.
+Native Debian Postfix stato­verride initializes postdrop/postqueue permissions;
+an extracted binary is not an installed package. Test an ordinary service user,
+not just root. Inspect actual publisher script paths and ship matching manuals.
+Directive: MIAB-03, MIAB-07, MIAB-11.
+
+## BP-MIAB-015 — Test read-only SQLite consumers after a cold restart
+
+SQLite WAL readers need existing readable side files, or permission to create
+them. Successful lookups while a privileged writer is connected do not prove a
+cold start. Chroot adds another boundary: use non-chroot proxymap for the four
+read-only address/domain lookup maps, without weakening daemon isolation.
+
+For a small user database with read-only mail consumers, an explicit operator
+migration to rollback journaling can remove that dependency. Stop consumers,
+take a coherent backup, compare every table's records and integrity before/after,
+and refuse active transactions. Do not grant mail daemons write access to user
+credentials or restore an old database. This is separate from webmail/Nextcloud
+databases and is never an automatic package postinst or routine setup action.
+Prove new-version cold startup, old-version delivery of newly queued mail and
+content preservation. Keep any unresolved mode or recovery limitation visible.
+Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.

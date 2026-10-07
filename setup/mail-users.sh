@@ -86,7 +86,7 @@ tools/editconf.py /etc/postfix/main.cf \
 # who authenticated. An SQL query will find who are the owners of any given
 # address.
 tools/editconf.py /etc/postfix/main.cf \
-	smtpd_sender_login_maps=sqlite:/etc/postfix/sender-login-maps.cf
+	smtpd_sender_login_maps=proxy:sqlite:/etc/postfix/sender-login-maps.cf
 
 # Postfix will query the exact address first, where the priority will be alias
 # records first, then user records. If there are no matches for the exact
@@ -107,9 +107,9 @@ EOF
 # bounce.
 tools/editconf.py /etc/postfix/main.cf \
 	smtputf8_enable=no \
-	virtual_mailbox_domains=sqlite:/etc/postfix/virtual-mailbox-domains.cf \
-	virtual_mailbox_maps=sqlite:/etc/postfix/virtual-mailbox-maps.cf \
-	virtual_alias_maps=sqlite:/etc/postfix/virtual-alias-maps.cf \
+	virtual_mailbox_domains=proxy:sqlite:/etc/postfix/virtual-mailbox-domains.cf \
+	virtual_mailbox_maps=proxy:sqlite:/etc/postfix/virtual-mailbox-maps.cf \
+	virtual_alias_maps=proxy:sqlite:/etc/postfix/virtual-alias-maps.cf \
 	local_recipient_maps=\$virtual_mailbox_maps
 
 # SQL statement to check if we handle incoming mail for a domain, either for users or aliases.

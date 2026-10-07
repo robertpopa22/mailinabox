@@ -95,3 +95,33 @@ must be tested through a copy of the actual native unit.
 
 Sources: [Dovecot 2.4 upgrade guide](https://doc.dovecot.org/latest/installation/upgrade/2.3-to-2.4.html),
 [publisher releases and signing key](https://github.com/dovecot/core/releases).
+
+## Optional Postfix publisher packages
+
+`postfix_package.py` builds core, SQLite and PCRE packages together from the
+pinned, separately signature-verified Postfix 3.11.7 archive. It retains native
+distribution units, maintainer scripts, alternatives and configuration handling;
+compiled ABI and manuals use the same source. This recipe is tested for Ubuntu
+24.04. It only builds; installation and recovery remain operator actions.
+
+Test an isolated queue/network/state with native Dovecot authentication, TLS,
+wrong-password/SQL-injection/refused-relay controls, LMTP, archive delivery and
+the ordinary user's queue command. Extracted binaries need the same native
+postdrop/postqueue initialization performed by distribution postinst.
+`postfix_tls.py` keeps older releases unchanged and removes the deprecated custom
+DH parameter on current versions, using publisher defaults; certificate keys and
+the explicit TLS policy stay intact. The inherited setup calls this only with
+the edition marker present.
+
+The general setup maps use `proxy:sqlite` so chrooted readers access SQLite through
+the native non-chroot proxymap service. WAL also has a side-file/cold-start
+requirement. `maildb_journal.py --database <private-path> --migrate` is an explicit
+metadata-only migration to rollback journaling, performed after coherent backup
+and stopping consumers. Test the final mode with both new and old packages;
+retain all records/newly queued messages. No old database/queue is restored.
+This does not change the separate Roundcube or Nextcloud database modes.
+
+Sources: [Postfix stable source](https://postfix.cs.utah.edu/source/),
+[proxymap](https://www.postfix.org/proxymap.8.html),
+[TLS defaults](https://www.postfix.org/DEPRECATION_README.html),
+[SQLite read-only WAL](https://sqlite.org/wal.html#read_only_databases).

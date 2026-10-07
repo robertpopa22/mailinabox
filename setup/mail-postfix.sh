@@ -325,5 +325,11 @@ ufw_allow submission
 
 # Restart services
 
+# >>> GESEIDL EDITION OVERLAY >>>
+if [ -f .geseidl-edition ]; then
+	python3 setup/geseidl_edition/components/postfix_tls.py --apply
+fi
+# <<< GESEIDL EDITION OVERLAY <<<
+
 restart_service postfix
 restart_service postgrey
