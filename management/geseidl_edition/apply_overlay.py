@@ -81,6 +81,38 @@ def _t(s):
 # (substring unic care indica ca e aplicat), block (text inserat, fara marker).
 HOOKS = [
 	{
+		"name": "status_checks:quiet-smtp-probe",
+		"file": "status_checks.py", "mode": "replace",
+		"anchor": '\t_code, ret = shell("check_call", ["/bin/nc", "-z", "-w5", "aspmx.l.google.com", "25"], trap=True)',
+		"signature": "_code, ret = probe_outbound_smtp(shell)",
+		"block": '\tfrom geseidl_edition.status_changes import probe_outbound_smtp\n\t_code, ret = probe_outbound_smtp(shell)\n',
+		"indent": "\t",
+	},
+	{
+		"name": "status_checks:apt-install-records",
+		"file": "status_checks.py", "mode": "after",
+		"anchor": "\t# Run apt-get upgrade in simulate mode to get a list of what",
+		"signature": "_apt_updates = (datetime.datetime.now(), pending_apt_updates(shell))",
+		"block": '\tfrom geseidl_edition.status_changes import pending_apt_updates\n\t_apt_updates = (datetime.datetime.now(), pending_apt_updates(shell))\n\treturn _apt_updates[1]\n',
+		"indent": "\t",
+	},
+	{
+		"name": "status_checks:held-update-policy",
+		"file": "status_checks.py", "mode": "after",
+		"anchor": "\tpkgs = list_apt_updates(apt_update=False)",
+		"signature": "report_software_updates(pkgs, is_reboot_needed_due_to_package_installation(), output, shell)",
+		"block": '\tfrom geseidl_edition.status_changes import report_software_updates\n\treport_software_updates(pkgs, is_reboot_needed_due_to_package_installation(), output, shell)\n\treturn\n',
+		"indent": "\t",
+	},
+	{
+		"name": "status_checks:group-category-changes",
+		"file": "status_checks.py", "mode": "after",
+		"anchor": "\t\tfor category, cur_lines in cur_status.items():",
+		"signature": "render_category_changes(category, prev_status.get(category), cur_lines, out)",
+		"block": '\t\t\tfrom geseidl_edition.status_changes import render_category_changes\n\t\t\trender_category_changes(category, prev_status.get(category), cur_lines, out)\n\t\t\tcontinue\n',
+		"indent": "\t\t\t",
+	},
+	{
 		"name": "daemon:/system/status",
 		"file": "daemon.py",
 		"mode": "after",

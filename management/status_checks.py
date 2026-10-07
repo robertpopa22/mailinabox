@@ -231,6 +231,11 @@ def is_reboot_needed_due_to_package_installation():
 def check_software_updates(env, output):
 	# Check for any software package updates.
 	pkgs = list_apt_updates(apt_update=False)
+	# >>> GESEIDL EDITION OVERLAY >>>
+	from geseidl_edition.status_changes import report_software_updates
+	report_software_updates(pkgs, is_reboot_needed_due_to_package_installation(), output, shell)
+	return
+	# <<< GESEIDL EDITION OVERLAY <<<
 	if is_reboot_needed_due_to_package_installation():
 		output.print_error("System updates have been installed and a reboot of the machine is required.")
 	elif len(pkgs) == 0:
@@ -327,7 +332,10 @@ def run_network_checks(env, output):
 	# Stop if we cannot make an outbound connection on port 25. Many residential
 	# networks block outbound port 25 to prevent their network from sending spam.
 	# See if we can reach one of Google's MTAs with a 5-second timeout.
-	_code, ret = shell("check_call", ["/bin/nc", "-z", "-w5", "aspmx.l.google.com", "25"], trap=True)
+	# >>> GESEIDL EDITION OVERLAY >>>
+	from geseidl_edition.status_changes import probe_outbound_smtp
+	_code, ret = probe_outbound_smtp(shell)
+	# <<< GESEIDL EDITION OVERLAY <<<
 	if ret == 0:
 		output.print_ok("Outbound mail (SMTP port 25) is not blocked.")
 	else:
@@ -976,6 +984,11 @@ def list_apt_updates(apt_update=True):
 		shell("check_call", ["/usr/bin/apt-get", "-qq", "update"])
 
 	# Run apt-get upgrade in simulate mode to get a list of what
+	# >>> GESEIDL EDITION OVERLAY >>>
+	from geseidl_edition.status_changes import pending_apt_updates
+	_apt_updates = (datetime.datetime.now(), pending_apt_updates(shell))
+	return _apt_updates[1]
+	# <<< GESEIDL EDITION OVERLAY <<<
 	# it would do.
 	simulated_install = shell("check_output", ["/usr/bin/apt-get", "-qq", "-s", "upgrade"])
 	pkgs = []
@@ -1084,6 +1097,11 @@ def run_and_output_changes(env, pool):
 			semantic_line_key = None
 		# <<< GESEIDL EDITION OVERLAY <<<
 		for category, cur_lines in cur_status.items():
+			# >>> GESEIDL EDITION OVERLAY >>>
+			from geseidl_edition.status_changes import render_category_changes
+			render_category_changes(category, prev_status.get(category), cur_lines, out)
+			continue
+			# <<< GESEIDL EDITION OVERLAY <<<
 			if category not in prev_status:
 				out.add_heading(category + " -- Added")
 				BufferedOutput(with_lines=cur_lines).playback(out)
