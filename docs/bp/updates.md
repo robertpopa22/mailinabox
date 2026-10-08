@@ -1,5 +1,13 @@
 # Application updates
 
+### BP-MIAB-021 — Keep the distribution package and contain its verification role
+- Context: Ubuntu's current OpenDKIM package has new CVEs still under evaluation; Rspamd already verifies incoming DKIM.
+- Mistake: treating a current distribution candidate as proof that every disclosed issue is patched, or assuming signing mode alone skips received signature tags.
+- Cause: libopendkim processes received DKIM-Signature tags during signing unless the skip-header option excludes them. Duplicate verifiers also complicate Authentication-Results trust.
+- Correct: retain the authenticated Ubuntu package; with Rspamd selected, use signer-only mode, omit received DKIM-Signature tags and preserve the verifier's cleaned results. Keep package evaluation explicit. Switching to another filter needs a fresh security review.
+- Proof: native private signing/authenticated/untrusted probes; independent signature verification and body-tamper failure; forged results removal and native OpenDMARC alignment. Pause SMTP/queue writers during the signer restart, preserve current queues/keys/DNS and test recovery from the retained configuration.
+- Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.
+
 ### BP-MIAB-020 — Reconcile SQLite metadata with native DDL and current rows
 
 - Context: historical upgrades left six ID columns as implicit rowid/autoincrement and a JSON column without its native Doctrine type comment.

@@ -110,6 +110,14 @@ tools/editconf.py /etc/opendkim.conf -s \
 # configuring smtpd_milters there to only list the OpenDKIM milter
 # (see mail-postfix.sh).
 SPAM_FILTER=$(cat "$STORAGE_ROOT/settings.yaml" 2>/dev/null | grep "^spam_filter:" | awk '{print $2}')
+# >>> GESEIDL EDITION OVERLAY >>>
+# Ubuntu continues to supply OpenDKIM. Rspamd verifies incoming signatures;
+# OpenDKIM is restricted to signing and skips received signature tag parsing.
+# This mitigates the selected role; it does not claim a package CVE patch.
+if [ -f .geseidl-edition ]; then
+	python3 setup/geseidl_edition/components/opendkim_signer.py --spam-filter "$SPAM_FILTER" --apply
+fi
+# <<< GESEIDL EDITION OVERLAY <<<
 if [ "$SPAM_FILTER" = "rspamd" ]; then
 	POSTFIX_MILTERS="inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893"
 else

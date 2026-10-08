@@ -7,6 +7,7 @@
 | BP | State | Evidence (test path / pattern / procedure) |
 |----|-------|---------------------------------------------|
 | BP-MIAB-001 | P | Verify target versions and archive checksums; rehearse app database migrations on isolated copies before applying `setup/webmail.sh` and `setup/nextcloud.sh`. |
+| BP-MIAB-021 | T/P | `tests/test_opendkim_signer.py` preserves key tables, custom omitted headers and idempotent roles; external maps require review. Native private milter probes must verify local/authenticated signing, untrusted verifier bypass, independent DKIM verification/tamper, forged Authentication-Results removal and Rspamd → OpenDKIM → OpenDMARC alignment. Ubuntu CVE evaluation remains visible; role mitigation is not a binary patch. |
 | BP-MIAB-005 | T/P | `tests/test_php_runtime.py`; validate Roundcube 1.7 `public_html` web root, PHP 8.5 authenticated clone endpoints, nginx syntax and configured FPM stop/start in backup. |
 | BP-MIAB-006 | P | `setup/geseidl_edition/nextcloud_compat.py` checks reviewed source hashes, builds a separately named app and preserves the guarded schema migration; NC 34→35 clone login, wrong-password rejection, DAV CRUD and original-data fingerprint comparison. |
 | BP-MIAB-007 | P | `setup/geseidl_edition/roundcube_secret.py` captures the existing validated key before code replacement; compare key fingerprints and authenticate webmail after installation. |

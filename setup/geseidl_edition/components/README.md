@@ -1,5 +1,18 @@
 # Optional publisher release channels
 
+`opendkim_signer.py` retains Ubuntu's OpenDKIM package and key tables. With
+Rspamd selected, it restricts OpenDKIM to signing, skips received DKIM-Signature
+tags while signing, and preserves Rspamd's verified Authentication-Results for
+OpenDMARC. Rspamd must remove forged results and supply DKIM verification.
+This is a role mitigation, not a package fix for CVE-2026-100888,
+CVE-2026-100889 or CVE-2026-101277; Ubuntu's evaluation remains visible.
+The SpamAssassin path retains OpenDKIM signing plus verification and needs a
+separate security review before changing away from the mitigated Rspamd path.
+The setup hook belongs to the optional edition; upstream defaults remain intact.
+Test native milters, independent signature verification, body tampering,
+untrusted and authenticated sources, forged results and OpenDMARC alignment
+before a bounded restart. Preserve current queues, keys and DNS records.
+
 `nextcloud_schema_migration.py` is an explicit, clone-tested reconciliation for
 seven historical Nextcloud 35.0.1 SQLite column definitions. It uses the installed
 publisher's DDL, retains all application rows and existing indexes, and refuses
