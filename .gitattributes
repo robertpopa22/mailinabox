@@ -12,6 +12,7 @@ setup/functions.sh                 text eol=lf
 setup/web.sh                       text eol=lf
 setup/zpush.sh                     text eol=lf
 setup/dns.sh                       text eol=lf
+setup/dkim.sh                      text eol=lf
 setup/mail-dovecot.sh              text eol=lf
 setup/mail-postfix.sh              text eol=lf
 setup/mail-users.sh                text eol=lf
