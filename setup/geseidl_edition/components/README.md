@@ -200,3 +200,30 @@ the traditional native daemon-owned control socket, with optional socket
 activation disabled in both systemd and package-helper state.
 
 Source: [Fail2ban publisher releases](https://github.com/fail2ban/fail2ban/releases).
+
+## Optional SpamAssassin publisher cohort
+
+`spamassassin_package.py` builds the pinned 4.0.2 source for Ubuntu 24.04 from
+retained, authenticated native spamassassin/spamd/spamc/sa-compile packages.
+Verify the publisher detached signature separately; the recipe verifies source
+SHA256 before creating its workspace and refuses an unreviewed base. All four
+packages use one source/version, keep native units/maintainers/config handling,
+avoid overlapping file ownership and retain matching manuals and readable modes.
+The recipe only builds, without installing packages or migrating learned data.
+
+The release source does not bundle the full scoring rules. Stage signed updates
+with the candidate executable/library cohort, including child lint commands,
+and provide the reviewed `4.000002` rule directory before reopening the daemon.
+Keep old rule directories available for recovery. Do not weaken GPG verification.
+Source and rule-update signing fingerprints differ and are recorded separately.
+
+Acceptance uses private runtime/config/rules and copies of all configured Bayes
+stores. Test native spamc/spamd classification of GTUBE and a normal message,
+then a distinct learning fixture and old-binary access to its new learned state.
+Local classification does not certify Internet reputation checks. Preserve all
+production policy files and learned data; use native PING/parser checks after
+installation so synthetic scoring messages do not train the live classifier.
+
+Sources: [publisher download/signature/checksums](https://spamassassin.apache.org/downloads.cgi),
+[release notes](https://spamassassin.apache.org/news.html),
+[rule update tool](https://spamassassin.apache.org/full/4.0.x/doc/sa-update.html).

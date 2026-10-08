@@ -120,6 +120,27 @@ excluded by an explicit fixed deadline separately. A built-in vectorset entry
 in MODULE LIST is distinct from loading external optional module libraries.
 Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.
 
+## BP-MIAB-019 — Validate complete helper cohorts and controlled learning fixtures
+
+Updating a main package without an exact-version helper can cause APT to remove
+that helper. Inspect the complete dependency cohort and reject removals. Preserve
+native file ownership boundaries; adding a helper to two packages creates an
+unpack conflict. New staging directories inherit the builder umask, so explicitly
+set package directory permissions and test an ordinary service account.
+
+An updater started with a candidate library may execute its lint subprocess
+against the installed old library. Isolate the full executable/library cohort,
+not just the top-level command. Keep source-signing and rule-update keys distinct,
+verify both and stage rules in their version-specific directory before startup.
+
+Do not copy transient GPG Unix sockets as persisted state. Classifier training
+changes the model: a learning fixture sharing vocabulary with a healthy fixture
+can invalidate that fixture's label. Use separate data, disable uncontrolled
+learning in the rehearsal and verify the actual documented counter columns.
+Test new training retained by the recovery binary; production tests use PING and
+parser checks rather than polluting the live model with synthetic messages.
+Directive: MIAB-03, MIAB-07, MIAB-11, MIAB-12.
+
 ## BP-MIAB-016 — Preserve listener scope and verify actual protocol methods
 
 nginx 1.25.1 introduced the server-level HTTP/2 directive. Converting a legacy
