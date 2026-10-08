@@ -1,5 +1,14 @@
 # Optional publisher release channels
 
+`nextcloud_schema_migration.py` is an explicit, clone-tested reconciliation for
+seven historical Nextcloud 35.0.1 SQLite column definitions. It uses the installed
+publisher's DDL, retains all application rows and existing indexes, and refuses
+unknown columns, invalid JSON or IDs, foreign keys and triggers. It supports a
+read-only plan; applying requires a new coherent backup and quiesced application
+writers. It is not an automatic setup migration. Native schema-check findings
+for disabled apps, retained historical data and postSchemaChange indexes remain
+visible. Recovery must restore only metadata over current rows, never a stale DB.
+
 This directory belongs to the Geseidl package. It does not change upstream's
 default distribution package selection or require upstream to follow our release
 cadence. General compatibility fixes are prepared separately for upstream.

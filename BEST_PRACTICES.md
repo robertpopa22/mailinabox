@@ -37,6 +37,7 @@
 | BP-MIAB-017 | Isolate native service directory lifecycle | Packaging | [Details](docs/bp/service-packages.md) |
 | BP-MIAB-018 | Prove cross-version persistence and numeric semantics | Packaging | [Details](docs/bp/service-packages.md) |
 | BP-MIAB-019 | Validate complete helper cohorts and controlled learning fixtures | Packaging | [Details](docs/bp/service-packages.md) |
+| BP-MIAB-020 | Reconcile SQLite metadata with native DDL and current rows | Updates | [Details](docs/bp/updates.md#bp-miab-020--reconcile-sqlite-metadata-with-native-ddl-and-current-rows) |
 | BP-MIAB-002 | Isolate clone instance IDs and temporary state | Updates | [Details](docs/bp/updates.md#bp-miab-002--isolate-clone-instance-ids-and-temporary-state) |
 | BP-MIAB-003 | Set generated webmail config readability explicitly | Updates | [Details](docs/bp/updates.md#bp-miab-003--set-generated-webmail-config-readability-explicitly) |
 | BP-MIAB-004 | Report structured checks and complete grouped changes | Reporting | [Details](docs/bp/reporting.md) |

@@ -1,5 +1,13 @@
 # Application updates
 
+### BP-MIAB-020 — Reconcile SQLite metadata with native DDL and current rows
+
+- Context: historical upgrades left six ID columns as implicit rowid/autoincrement and a JSON column without its native Doctrine type comment.
+- Mistake: treating all schema findings as runtime damage or all differences as harmless SQLite representation.
+- Cause: actual column migrations, postSchemaChange indexes, historical tables and disabled-app migrations have distinct semantics. Compare a native fresh installation and publisher-generated DDL, not only version numbers.
+- Correct: use the installed release's schema SQL, refuse changed columns, non-integer IDs, invalid JSON, foreign keys or triggers needing a separate review. Preserve every row and existing index in an atomic transaction. Test authenticated CRUD and old-metadata recovery over current new rows; never restore stale application data.
+- Proof: `tests/test_nextcloud_schema_migration.py`; deployment clone evidence stays private. Existing partial UNIQUE and descending indexes are runtime guarantees, not objects to remove for a clean replay-based checker. Historical data is retained, and remaining unrecognised differences stay visible (MIAB-06/07/09).
+
 ### BP-MIAB-001 — Review release pins as well as the fork Git head
 - Context: the fork was synchronized while its application pins still lagged behind supported maintenance releases.
 - Mistake: interpreting a current fork commit as evidence that every component is current.

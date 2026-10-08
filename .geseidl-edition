@@ -1,7 +1,8 @@
 # Geseidl Edition overlay manifest.
 # Prezenta acestui fisier = overlay activ. Vezi management/geseidl_edition/OVERLAY.md
 edition: geseidl
-overlay_version: 0.17.0
+overlay_version: 0.18.0
+# 0.18.0: reconciliere SQLite NC35 explicita, DDL nativ si toate randurile pastrate.
 # 0.17.0: cohort SpamAssassin4.0.2 optional, pachete/control/ownership nativ pastrate.
 # 0.16.0: Redis/F2b publisher optionale, AOF/recovery explicit si logging NSD nativ.
 # 0.15.0: canal nginxstable oficial optional si HTTP2 version-aware cu scope pastrat.
