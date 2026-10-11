@@ -1,5 +1,7 @@
 # Zona spam — rspamd (Geseidl Edition)
 
+Versiunea0.20.0: [reputație DNS, impersonare, AI selectiv și reguli semnate](ANTISPAM.md).
+
 rspamd înlocuiește SpamAssassin ca filtru de spam. Cel mai mare subsistem din overlay.
 Selecția filtrului = `spam_filter: rspamd` în `settings.yaml`; tot codul de integrare
 e condiționat de această cheie.

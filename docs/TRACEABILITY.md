@@ -6,6 +6,7 @@
 
 | BP | State | Evidence (test path / pattern / procedure) |
 |----|-------|---------------------------------------------|
+| BP-MIAB-022 | T/P | `tests/test_reputation_dns.py`, `test_antispam_overlay.py`, `test_antispam_rule_update.py`, `test_rspamd_report.py`, `brand_guard_cases.lua`; native clone, six real messages, provider positive/negative canaries and exact gateway persistence/unchanged-firewall evidence. [Runbook](../setup/geseidl_edition/zones/spam/ANTISPAM.md). |
 | BP-MIAB-001 | P | Verify target versions and archive checksums; rehearse app database migrations on isolated copies before applying `setup/webmail.sh` and `setup/nextcloud.sh`. |
 | BP-MIAB-021 | T/P | `tests/test_opendkim_signer.py` preserves key tables, custom omitted headers and idempotent roles; external maps require review. Native private milter probes must verify local/authenticated signing, untrusted verifier bypass, independent DKIM verification/tamper, forged Authentication-Results removal and Rspamd → OpenDKIM → OpenDMARC alignment. Ubuntu CVE evaluation remains visible; role mitigation is not a binary patch. |
 | BP-MIAB-005 | T/P | `tests/test_php_runtime.py`; validate Roundcube 1.7 `public_html` web root, PHP 8.5 authenticated clone endpoints, nginx syntax and configured FPM stop/start in backup. |

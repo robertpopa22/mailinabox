@@ -21,6 +21,7 @@
 
 | ID | Title | Category | Link |
 |----|-------|----------|------|
+| BP-MIAB-022 | Reputation evidence and reproducible antispam policy | Spam/DNS | [Details](docs/bp/antispam.md) |
 | BP-MIAB-001 | Review release pins as well as the fork Git head | Updates | [Details](docs/bp/updates.md) |
 | BP-MIAB-021 | Separate an Ubuntu signing role from unpatched signature verification | Updates | [Details](docs/bp/updates.md) |
 | BP-MIAB-005 | Validate major-version web roots and runtime backup coherence | Updates | [Details](docs/bp/latest-stable.md) |

@@ -19,6 +19,11 @@ RESOLVED_CONF="/etc/systemd/resolved.conf"
 
 log() { echo "[geseidl/dns] $*"; }
 
+# Reputation zones must be verified even when the legacy resolver/Spamhaus
+# signature is already present. Gate on real positive AND negative answers.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+python3 "$HERE/reputation_dns.py" --apply || exit 1
+
 # --- idempotenta ---
 already_resolver=0
 if [ -f /etc/resolv.conf ] && ! [ -L /etc/resolv.conf ] && grep -q "^nameserver 127.0.0.1" /etc/resolv.conf; then

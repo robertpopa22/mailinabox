@@ -150,4 +150,6 @@ sudo systemctl restart mailinabox
 
 ## Vezi și
 
+- [Antispam și reputație DNS, versiunea 0.20.0](../../setup/geseidl_edition/zones/spam/ANTISPAM.md): profil privat, plan/apply, teste native și recuperare.
+
 - Fork: `robertpopa22/mailinabox`

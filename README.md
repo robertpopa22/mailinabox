@@ -6,6 +6,11 @@
 
 ## What this fork is
 
+The [GESEIDL antispam module](setup/geseidl_edition/zones/spam/ANTISPAM.md) maintains
+reputation DNS health, sender/brand mismatch detection, bounded local AI and an
+automatically validated subset of signed SpamAssassin rules. Deployment bindings
+stay in a private profile outside this repository.
+
 A **continuously-used production fork** of MiaB. Not theoretical, not a sandbox: this codebase runs the live mail server of [Geseidl Consulting Group](https://geseidl.ro) every day.
 
 Production scale (as of April 2026):

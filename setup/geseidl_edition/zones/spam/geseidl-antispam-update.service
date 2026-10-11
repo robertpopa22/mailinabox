@@ -1,0 +1,15 @@
+[Unit]
+Description=Signed SpamAssassin subset validation and Rspamd publication
+After=network-online.target rspamd.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/geseidl-antispam-rule-update
+TimeoutStartSec=6min
+UMask=0022
+Nice=10
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/geseidl-antispam-updates /var/lib/rspamd/geseidl-sa /var/lib/spamassassin/sa-update-keys

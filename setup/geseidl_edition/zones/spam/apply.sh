@@ -84,6 +84,7 @@ else
 fi
 
 if [ "$rc" = 0 ]; then
+	python3 "$HERE/antispam.py" --apply || exit 1
 	log "zona spam OK. (patch-urile pe setup/*.sh prind efect la 'sudo mailinabox')."
 else
 	log "zona spam: unul sau mai multe patch-uri n-au putut fi aplicate — vezi mesajele de mai sus."

@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily signed antispam rule maintenance
+[Timer]
+OnCalendar=*-*-* 04:15:00
+RandomizedDelaySec=15min
+Persistent=true
+Unit=geseidl-antispam-update.service
+[Install]
+WantedBy=timers.target
