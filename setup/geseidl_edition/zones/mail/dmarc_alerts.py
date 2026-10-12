@@ -437,7 +437,8 @@ def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str
 	message["Date"] = format_datetime(datetime.now(UTC))
 	message["Message-ID"] = f"<dmarc-alert-{digest}@{sender.rpartition('@')[2] or 'localhost'}>"
 	message["Auto-Submitted"] = "auto-generated"
-	message["X-Geseidl-Status"] = "WARNING"
+	message["X-Geseidl-Status"] = "WARN"
+	message["X-Geseidl-Source"] = "dmarc-aggregate"
 	message["X-Geseidl-Alert-Key"] = digest
 	message.set_content("\n".join(plain_lines))
 	message.add_alternative(html_body, subtype="html")
