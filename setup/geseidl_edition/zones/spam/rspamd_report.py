@@ -178,7 +178,7 @@ def assess_health(d_learned, d_scanned, previous_learned, previous_scanned,
         notes.append("Stare servicii necolectata: " + ", ".join(sorted(unknown_services)))
     if d_learned < 0 and not counter_reset:
         status = "EROARE"
-        alerts.append(f"Delta learned negativ ({d_learned}) — posibila problema rspamd/Redis")
+        alerts.append(f"Delta learned negativ ({d_learned}) â€” posibila problema rspamd/Redis")
     elif d_learned == 0 and previous_learned > 0 and learn_failures is not None and learn_failures > 0:
         if status == "OK":
             status = "ALERT"
@@ -208,7 +208,7 @@ def assess_health(d_learned, d_scanned, previous_learned, previous_scanned,
         notes.append("Configuratia milter nu poate fi colectata; scanarea nu este confirmata")
     elif milter_ok is False:
         status = "EROARE"
-        alerts.append("rspamd milter (11332) LIPSESTE din postfix smtpd_milters — mail nescanat! "
+        alerts.append("rspamd milter (11332) LIPSESTE din postfix smtpd_milters â€” mail nescanat! "
                       "Fix: postconf -e 'smtpd_milters = inet:127.0.0.1:11332 inet:127.0.0.1:8891 inet:127.0.0.1:8893' "
                       "+ idem non_smtpd_milters + systemctl reload postfix")
     return status, alerts, notes
@@ -290,7 +290,7 @@ def get_learn_events(hours=24):
 
 
 def check_milter_chain():
-    """rspamd milter (11332) must be in postfix smtpd_milters — lost on 2026-06-09 v75 upgrade."""
+    """rspamd milter (11332) must be in postfix smtpd_milters â€” lost on 2026-06-09 v75 upgrade."""
     code, raw = run_result("postconf -h smtpd_milters 2>/dev/null")
     if code != 0:
         return None
@@ -318,7 +318,10 @@ def get_gpt_stats(paths=None, now=None):
     cutoff = now - timedelta(hours=24)
     symbols = ["GPT_SPAM", "GPT_HAM", "GPT_PHISHING", "GPT_SCAM", "GPT_MALWARE", "GPT_MARKETING", "GPT_UNCERTAIN", "GPT_BACKEND_UNAVAILABLE", "GPT_SKIPPED_DECIDED"]
     counts = dict.fromkeys(symbols, 0)
-    counts.update(available=True, backend_errors=0, timeouts=0, window_hours=24)
+    counts.update(available=True, backend_errors=0, timeouts=0, window_hours=24,
+                  current_backend_errors=0, current_timeouts=0, current_unavailable=0,
+                  current_model_results=0, current_window_minutes=60,
+                  last_error=None, last_model_result=None)
     seen = set()
     for index, path in enumerate(paths):
         try:
@@ -333,14 +336,24 @@ def get_gpt_stats(paths=None, now=None):
                     if not cutoff <= stamp <= now or line in seen:
                         continue
                     seen.add(line)
+                    current = stamp >= now - timedelta(hours=1)
                     if "rspamd_task_write_log:" in line:
                         for symbol in symbols:
                             if re.search(r"\b" + symbol + r"\(", line):
                                 counts[symbol] += 1
+                                if symbol == 'GPT_BACKEND_UNAVAILABLE':
+                                    counts['last_error'] = max(counts['last_error'] or '', stamp.isoformat())
+                                    if current: counts['current_unavailable'] += 1
+                                elif symbol not in ('GPT_UNCERTAIN','GPT_SKIPPED_DECIDED'):
+                                    counts['last_model_result'] = max(counts['last_model_result'] or '', stamp.isoformat())
+                                    if current: counts['current_model_results'] += 1
                     if "gpt.lua:" in line and "request failed:" in line:
                         counts["backend_errors"] += 1
+                        counts['last_error'] = max(counts['last_error'] or '', stamp.isoformat())
+                        if current: counts['current_backend_errors'] += 1
                         if "timeout" in line.lower():
                             counts["timeouts"] += 1
+                            if current: counts['current_timeouts'] += 1
         except FileNotFoundError:
             if index == 0:
                 counts["available"] = False
@@ -354,12 +367,19 @@ def apply_gpt_health(status, alerts, notes, gpt):
         if status == "OK":
             status = "ALERT"
         notes.append("Jurnalul AI nu poate fi colectat complet; disponibilitatea clasificarii este necunoscuta")
-    if gpt["backend_errors"] or gpt["GPT_BACKEND_UNAVAILABLE"]:
+    if gpt["current_backend_errors"] or gpt["current_unavailable"]:
         if status == "OK":
             status = "ALERT"
-        alerts.append(f'AI degradat in ultimele 24h: {gpt["backend_errors"]} erori backend, '
-                      f'{gpt["timeouts"]} timeouturi, {gpt["GPT_BACKEND_UNAVAILABLE"]} mesaje fara rezultat de model; '
+        alerts.append(f'AI degradat in ultima ora: {gpt["current_backend_errors"]} erori backend, '
+                      f'{gpt["current_timeouts"]} timeouturi, {gpt["current_unavailable"]} mesaje fara rezultat de model; '
                       'GPT_UNCERTAIN nu confirma functionarea AI')
+    elif gpt['backend_errors'] or gpt['GPT_BACKEND_UNAVAILABLE']:
+        recovered = bool(gpt['last_model_result'] and gpt['last_error']
+                         and gpt['last_model_result'] > gpt['last_error'])
+        notes.append('Istoric AI 24h: '+str(gpt['backend_errors'])+' erori; ultima ora fara erori observate. '
+                     + ('Rezultat real de model ulterior ultimei erori: revenire observata.' if recovered
+                        else 'Revenirea nu este confirmata printr-un rezultat de model ulterior.'))
+        if not recovered and status == 'OK': status = 'ALERT'
     return status
 
 
@@ -544,7 +564,7 @@ def main():
 
     sep = "=" * 60
 
-    body = f"""Raport rspamd — {now.strftime("%Y-%m-%d %H:%M")}
+    body = f"""Raport rspamd â€” {now.strftime("%Y-%m-%d %H:%M")}
 {sep}
 Status: {status}
 rspamd uptime since: {uptime}
@@ -619,7 +639,9 @@ LEARN EVENTS (fisiere curent + .1, stage 4096; fereastra variabila de rotatie)
 FILTRU LLM (gpt module; enabled efectiv: {availability_label(gpt_enabled)})
 {"-" * 40}
   Fereastra: ultimele 24h; colector complet: {availability_label(gpt["available"])}
-  Erori backend: {gpt["backend_errors"]}; timeouturi: {gpt["timeouts"]}
+  Ultima ora: {gpt["current_backend_errors"]} erori / {gpt["current_timeouts"]} timeouturi / {gpt["current_model_results"]} rezultate reale
+  Ultima eroare: {gpt["last_error"]}; ultimul rezultat real: {gpt["last_model_result"]}
+  Istoric 24h: {gpt["backend_errors"]} erori backend; {gpt["timeouts"]} timeouturi
   GPT_BACKEND_UNAVAILABLE: {gpt["GPT_BACKEND_UNAVAILABLE"]}
   GPT_SKIPPED_DECIDED: {gpt["GPT_SKIPPED_DECIDED"]}
   GPT_SPAM:      {gpt.get("GPT_SPAM", 0)}
@@ -663,12 +685,12 @@ SUMAR
 Raport generat de /usr/local/bin/rspamd_learn_report.py
 """
 
-    subject = f"[Mail] rspamd {status} — {now.strftime('%Y-%m-%d')}"
+    subject = f"[Mail] rspamd {status} â€” {now.strftime('%Y-%m-%d')}"
     if previous.get("learned"):
         subject += f" (delta: {d_learned:+d})"
 
     # Send email only when there is something actionable (ALERT/EROARE) or once a
-    # week as a health digest (Monday). OK days are silent — the daily cron still
+    # week as a health digest (Monday). OK days are silent â€” the daily cron still
     # runs and updates state below, so 24h deltas stay correct.
     weekly_digest = now.weekday() == 0  # Monday
     if status != "OK" or weekly_digest:
@@ -677,7 +699,7 @@ Raport generat de /usr/local/bin/rspamd_learn_report.py
             return 1
         print(f"Report sent: {subject}")
     else:
-        print(f"Status OK — email skipped: {subject}")
+        print(f"Status OK â€” email skipped: {subject}")
 
     # Retain the last valid baseline during collection failures.
     if not stat["available"] or not redis["available"]:

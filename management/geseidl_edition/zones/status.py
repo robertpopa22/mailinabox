@@ -65,9 +65,18 @@ def _upstream_commit_gap(manifest):
 			text=True, timeout=5).stdout.strip()
 		if not re.fullmatch(r"[0-9a-f]{40,64}", head):
 			return None, "HEAD Git invalid"
+		origin = subprocess.run(
+			["git", "-C", repo, "remote", "get-url", "origin"],
+			check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+			text=True, timeout=5).stdout.strip()
+		# A fork-only commit does not exist in the upstream API repository.
+		# Compare in the fork namespace against the upstream branch instead.
+		match = re.fullmatch(r"(?:https://github\.com/|git@github\.com:)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?", origin)
+		if not match:
+			return None, "origin GitHub nu poate fi verificat"
 		compare_url = (
-			"https://api.github.com/repos/mail-in-a-box/mailinabox/compare/"
-			f"{urllib.parse.quote(head)}...main")
+			f"https://api.github.com/repos/{match.group(1)}/compare/"
+			f"{urllib.parse.quote(head)}...mail-in-a-box:main")
 		request = urllib.request.Request(compare_url, headers={
 			"Accept": "application/vnd.github+json",
 			"User-Agent": "Geseidl-Mailinabox-Upstream-Status/1.0",

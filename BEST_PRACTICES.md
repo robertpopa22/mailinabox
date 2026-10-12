@@ -1,5 +1,7 @@
 # Best practices — index
 
+| BP-MIAB-023 | Separate current alert state from history and verify fork sources | Reporting | [Details](docs/bp/alert-reporting.md) |
+
 > Charter: [`CHARTER.md`](CHARTER.md) (directive MIAB-09). This file is an **index**: one row per lesson.
 > Details live in `docs/bp/<category>.md` (split a category file when it passes ~300 lines).
 > Coverage of each lesson (test / pattern / gap) is tracked in [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md);
