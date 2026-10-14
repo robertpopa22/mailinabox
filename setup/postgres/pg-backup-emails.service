@@ -14,6 +14,8 @@ ExecStart=/usr/bin/flock -w 300 /var/lock/pg-backup-emails.lock /usr/local/bin/p
 Environment=BACKUP_DIR=/home/user-data/pg-backup
 Environment=DB_NAME=ges_mail
 Environment=RETENTION_DAYS=30
+# regenerable B6 semantic-index data (rebuild: mail_chunk_load + mail_embed); the VM is in ABB + Hyper-V Replica
+Environment="EXCLUDE_TABLE_DATA=public.mail_chunk public.mail_chunk_state public.vec_bge_m3_f16_v1 public.vec_text_hash"
 StandardOutput=journal
 StandardError=journal
-TimeoutStartSec=7200
+TimeoutStartSec=14400

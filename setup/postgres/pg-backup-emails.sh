@@ -10,6 +10,10 @@ set -euo pipefail
 BACKUP_DIR="${BACKUP_DIR:-/home/user-data/pg-backup}"
 DB_NAME="${DB_NAME:-ges_mail}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
+# Space-separated tables whose DATA is left out of the dump (their schema is kept). Used for data that is regenerable
+# and large: the B6 semantic index (mail_chunk / mail_chunk_state from the maildir, vec_* by re-embedding on LLM01).
+# The VM itself is covered by Synology ABB + Hyper-V Replica. (14.10.2026: with the vectors the dump overran 2 h.)
+EXCLUDE_TABLE_DATA="${EXCLUDE_TABLE_DATA:-}"
 
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
@@ -22,8 +26,17 @@ echo "[$(date -Iseconds)] pg_dump $DB_NAME -> $OUT_FILE"
 
 # --format=custom is compressed (zstd-like) + supports parallel restore.
 # Local socket auth — User=postgres in the systemd unit means peer auth applies.
+EXCLUDE_ARGS=()
+for t in $EXCLUDE_TABLE_DATA; do
+  EXCLUDE_ARGS+=("--exclude-table-data=$t")
+done
+if [ ${#EXCLUDE_ARGS[@]} -gt 0 ]; then
+  echo "[$(date -Iseconds)] data excluded (schema kept): $EXCLUDE_TABLE_DATA"
+fi
+
 pg_dump \
   --format=custom \
+  "${EXCLUDE_ARGS[@]}" \
   --compress=9 \
   --no-owner \
   --no-privileges \
