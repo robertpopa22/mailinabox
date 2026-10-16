@@ -362,7 +362,14 @@ def get_gpt_stats(paths=None, now=None):
     return counts
 
 
-def apply_gpt_health(status, alerts, notes, gpt):
+def apply_gpt_health(status, alerts, notes, gpt, enabled=True):
+    if enabled is False:
+        notes.append('AI dezactivat explicit in configuratia efectiva; erorile istorice nu solicita recuperarea modelului. '
+                     f'Istoric 24h: {gpt["backend_errors"]} erori backend. Filtrele active sunt evaluate separat.')
+        return status
+    if enabled is None:
+        notes.append('Starea configuratiei AI este necunoscuta; dezactivarea nu poate fi presupusa.')
+        if status == 'OK': status = 'ALERT'
     if not gpt["available"]:
         if status == "OK":
             status = "ALERT"
@@ -540,7 +547,7 @@ def main():
         counter_reset=counter_reset,
         collectors_ok=stat["available"] and redis["available"],
     )
-    status = apply_gpt_health(status, alerts, notes, gpt)
+    status = apply_gpt_health(status, alerts, notes, gpt, enabled=gpt_enabled)
     rule_update = get_rule_update_status()
     reputation = get_reputation_health()
     if reputation['status'] != 'OK':

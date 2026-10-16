@@ -45,3 +45,6 @@
 | BP-MIAB-002 | Isolate clone instance IDs and temporary state | Updates | [Details](docs/bp/updates.md#bp-miab-002--isolate-clone-instance-ids-and-temporary-state) |
 | BP-MIAB-003 | Set generated webmail config readability explicitly | Updates | [Details](docs/bp/updates.md#bp-miab-003--set-generated-webmail-config-readability-explicitly) |
 | BP-MIAB-004 | Report structured checks and complete grouped changes | Reporting | [Details](docs/bp/reporting.md) |
+
+
+| BP-MIAB-021 | Retired optional classifiers do not require synthetic recovery | Reporting | [Details](docs/bp/reporting.md#bp-miab-021--retired-classifier-health) |

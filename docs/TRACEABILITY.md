@@ -29,3 +29,6 @@
 | BP-MIAB-002 | P | A rehearsal config sets a unique `instanceid` and private `tempdirectory`; copied data/config paths alone do not isolate Nextcloud `FileSequence` locks. |
 | BP-MIAB-003 | P | `setup/webmail.sh` explicitly sets main/password config to root:www-data, 0640; verify reads and authenticated webmail access as the service user. |
 | BP-MIAB-004 | T | `tests/test_geseidl_reporting.py`: captured SMTP diagnostics and preserved failures; noncontiguous changes; new APT dependencies; held/unknown/reboot states; idempotent hook persistence. |
+
+
+| BP-MIAB-021 | T | `tests/test_rspamd_report.py::test_disabled_gpt_keeps_history_informational_and_active_failures_visible` |

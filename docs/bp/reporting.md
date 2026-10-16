@@ -7,3 +7,13 @@
 - Correct: capture probe diagnostics and preserve its exit code; consolidate every changed item into at most one Previous and one Current block per category. Count only valid APT Inst records, include new dependencies without allowing removals, and display held candidates separately. An unknown hold state stays a warning, and reboot and pending-package states can both remain visible.
 - Proof: `tests/test_geseidl_reporting.py` exercises real fragmentation, success/failure capture, APT package records, policy holds, unknown state, reboot and reapplying/removing the hooks against the actual source.
 - Directive: MIAB-01, MIAB-03, MIAB-06, MIAB-09.
+
+
+### BP-MIAB-021 — Retired classifier health
+
+Effective `enabled=false` means an optional classifier was disabled explicitly.
+Historical model timeouts remain informational; they cannot demand a later model
+success after retirement. Unknown configuration remains actionable, and failures
+of active mail filters retain their original severity. The regression test covers
+disabled, unknown and already-critical states; a cloned reporter with read-only
+live collectors and intercepted send/save validates the deployment separately.

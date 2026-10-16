@@ -39,6 +39,16 @@ def test_ai_missing_logs_unknown_and_true_uncertainty_is_not_outage(tmp_path):
     assert MODULE.apply_gpt_health('OK', [], [], stats) == 'OK'
 
 
+def test_disabled_gpt_keeps_history_informational_and_active_failures_visible(tmp_path):
+    stats=MODULE.get_gpt_stats([tmp_path/'absent'], MODULE.datetime(2026,10,16,8))
+    stats['backend_errors']=27
+    notes=[]
+    assert MODULE.apply_gpt_health('OK',[],notes,stats,enabled=False)=='OK'
+    assert '27' in notes[0] and 'dezactivat' in notes[0]
+    assert MODULE.apply_gpt_health('EROARE',['milter missing'],[],stats,enabled=False)=='EROARE'
+    assert MODULE.apply_gpt_health('OK',[],[],stats,enabled=None)=='ALERT'
+
+
 def test_rule_update_freshness_and_missing_are_explicit(tmp_path):
     from datetime import timezone
     now=MODULE.datetime(2026,10,11,12,tzinfo=timezone.utc)
