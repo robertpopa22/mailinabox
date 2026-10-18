@@ -32,3 +32,4 @@
 
 
 | BP-MIAB-021 | T | `tests/test_rspamd_report.py::test_disabled_gpt_keeps_history_informational_and_active_failures_visible` |
+| BP-MIAB-024 | T/P | `tests/test_dmarc_alerts.py` covers aligned source-only deferral, immediate authentication/policy/report errors, restart persistence, once-per-day batching, duplicate records, dry-run and crash/timeout without automatic resend. The additive SQLite outbox records uncertainty before local sendmail; originals remain archived. |

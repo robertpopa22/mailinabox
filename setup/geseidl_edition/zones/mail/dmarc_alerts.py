@@ -22,7 +22,7 @@ import subprocess
 import sys
 import zipfile
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email import policy
 from email.message import EmailMessage, Message
 from email.parser import BytesParser
@@ -31,6 +31,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Iterable
 from xml.etree import ElementTree as ET
+from zoneinfo import ZoneInfo
 
 LOGGER = logging.getLogger("geseidl-dmarc-alerts")
 
@@ -341,14 +342,105 @@ def open_state(state_dir: Path) -> sqlite3.Connection:
 		)
 		"""
 	)
+	connection.executescript("""
+		CREATE TABLE IF NOT EXISTS digest_reports (
+			report_key TEXT PRIMARY KEY, report_json TEXT NOT NULL,
+			due_day TEXT NOT NULL, queued_utc TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS notification_outbox (
+			batch_key TEXT PRIMARY KEY, category TEXT NOT NULL,
+			status TEXT NOT NULL CHECK(status IN ('uncertain', 'sent')),
+			created_utc TEXT NOT NULL, sent_utc TEXT, error_code TEXT
+		);
+		CREATE TABLE IF NOT EXISTS outbox_reports (
+			report_key TEXT PRIMARY KEY, batch_key TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS digest_days (
+			day TEXT PRIMARY KEY, batch_key TEXT NOT NULL
+		);
+	""")
 	return connection
 
 
 def was_processed(connection: sqlite3.Connection, report_key: str) -> bool:
-	return connection.execute("SELECT 1 FROM processed_reports WHERE report_key = ?", (report_key,)).fetchone() is not None
+	return any(connection.execute(f"SELECT 1 FROM {table} WHERE report_key = ?", (report_key,)).fetchone()
+		for table in ('processed_reports', 'digest_reports', 'outbox_reports'))
 
 
-def mark_processed(connection: sqlite3.Connection, report: DmarcReport, result: str) -> None:
+def digest_only(report: DmarcReport, allowed_source_ips: set[str]) -> bool:
+	"""Source novelty alone is unconfirmed metadata, not an authentication failure."""
+	return (set(report.get_problem_codes(allowed_source_ips)) == {'unexpected_source_ip'}
+		and report.percentage == 100
+		and all(record.disposition.lower() == 'none' and
+			(record.dkim.lower() == 'pass' or record.spf.lower() == 'pass') for record in report.records))
+
+
+def queue_digest(connection, report, now, digest_hour, digest_timezone):
+	local = now.astimezone(UTC if digest_timezone == 'UTC' else ZoneInfo(digest_timezone))
+	due = local.date() + timedelta(days=int(local.hour >= digest_hour))
+	connection.execute('INSERT OR IGNORE INTO digest_reports VALUES (?, ?, ?, ?)',
+		(report.report_key, json.dumps(asdict(report)), due.isoformat(), now.isoformat()))
+	connection.commit()
+
+
+def restore_report(raw):
+	value = json.loads(raw)
+	value['records'] = tuple(DmarcRecord(**record) for record in value['records'])
+	return DmarcReport(**value)
+
+
+def send_once(connection, reports, sender, notify, allowed_source_ips, now, *, digest_day=None):
+	"""Reserve before dispatch. A crash or unconfirmed send is never replayed automatically."""
+	connection.execute('BEGIN IMMEDIATE')
+	try:
+		if digest_day and connection.execute('SELECT 1 FROM digest_days WHERE day=?', (digest_day,)).fetchone():
+			connection.rollback()
+			return False
+		reports = tuple({report.report_key: report for report in reports if not connection.execute(
+			'SELECT 1 FROM outbox_reports WHERE report_key=?', (report.report_key,)).fetchone()}.values())
+		if not reports:
+			connection.rollback()
+			return False
+		category = 'digest' if digest_day else 'immediate'
+		key = hashlib.sha256((category + '\n' + '\n'.join(sorted(r.report_key for r in reports))).encode()).hexdigest()
+		connection.execute('INSERT INTO notification_outbox VALUES (?, ?, ?, ?, NULL, NULL)',
+			(key, category, 'uncertain', now.isoformat()))
+		connection.executemany('INSERT INTO outbox_reports VALUES (?, ?)', ((r.report_key, key) for r in reports))
+		if digest_day:
+			connection.execute('INSERT INTO digest_days VALUES (?, ?)', (digest_day, key))
+		connection.commit()
+	except BaseException:
+		connection.rollback()
+		raise
+	message = build_alert_message(reports, sender, notify, allowed_source_ips, source_digest=bool(digest_day))
+	if digest_day:
+		message.replace_header('Subject', '[DMARC digest] surse neconfirmate cu aliniere reusita — ' + digest_day)
+		message.replace_header('Message-ID', f"<dmarc-digest-{key[:24]}@{sender.rpartition('@')[2] or 'localhost'}>")
+	try:
+		submit_alert(message)
+	except Exception as exc:
+		connection.execute('UPDATE notification_outbox SET error_code=? WHERE batch_key=?', (type(exc).__name__, key))
+		connection.commit()
+		LOGGER.error('notification unconfirmed; automatic replay disabled: %s', category)
+		return False
+	connection.execute("UPDATE notification_outbox SET status='sent', sent_utc=? WHERE batch_key=?", (now.isoformat(), key))
+	for report in reports:
+		mark_processed(connection, report, 'alerted', commit=False)
+		connection.execute('DELETE FROM digest_reports WHERE report_key=?', (report.report_key,))
+	connection.commit()
+	return True
+
+
+def flush_digest(connection, sender, notify, allowed_source_ips, now, digest_hour, digest_timezone):
+	local = now.astimezone(UTC if digest_timezone == 'UTC' else ZoneInfo(digest_timezone))
+	cut = local.date() - timedelta(days=int(local.hour < digest_hour))
+	reports = tuple(restore_report(row[0]) for row in connection.execute(
+		'SELECT report_json FROM digest_reports WHERE due_day<=? ORDER BY report_key', (cut.isoformat(),)))
+	return send_once(connection, reports, sender, notify, allowed_source_ips, now,
+		digest_day=local.date().isoformat()) if reports else False
+
+
+def mark_processed(connection: sqlite3.Connection, report: DmarcReport, result: str, *, commit: bool = True) -> None:
 	connection.execute(
 		"""
 		INSERT OR IGNORE INTO processed_reports
@@ -366,7 +458,8 @@ def mark_processed(connection: sqlite3.Connection, report: DmarcReport, result: 
 			datetime.now(UTC).isoformat(),
 		),
 	)
-	connection.commit()
+	if commit:
+		connection.commit()
 
 
 def _format_epoch(value: int) -> str:
@@ -375,14 +468,18 @@ def _format_epoch(value: int) -> str:
 	return datetime.fromtimestamp(value, tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
-def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str, allowed_source_ips: set[str]) -> EmailMessage:
+def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str, allowed_source_ips: set[str],
+	*, source_digest: bool = False) -> EmailMessage:
 	reports = tuple(reports)
 	domains = sorted({report.policy_domain for report in reports})
 	affected = sum(report.get_affected_messages(allowed_source_ips) for report in reports)
 	digest = hashlib.sha256("\n".join(sorted(report.report_key for report in reports)).encode()).hexdigest()[:24]
+	opening = ("Surse IP neconfirmate, cu aliniere DMARC reusita; autenticitatea sursei nu este stabilita de acest raport."
+		if source_digest else "Au fost detectate probleme în rapoartele agregate DMARC.")
+	title = 'Digest DMARC — surse neconfirmate' if source_digest else 'Alertă DMARC'
 
 	plain_lines = [
-		"Au fost detectate probleme în rapoartele agregate DMARC.",
+		opening,
 		"",
 		f"Domenii: {', '.join(domains)}",
 		f"Mesaje afectate: {affected}",
@@ -421,8 +518,8 @@ def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str
 	html_body = f"""<!doctype html>
 <html lang="ro"><body style="margin:0;background:#f4f7f5;font-family:Arial,sans-serif;color:#1f2933">
 <div style="max-width:760px;margin:24px auto;background:#fff;border:1px solid #d8e2dc;border-radius:10px;overflow:hidden">
-<div style="padding:20px 24px;background:#174f3a;color:#fff"><h1 style="margin:0;font-size:20px">Alertă DMARC</h1></div>
-<div style="padding:24px"><p style="margin-top:0">Au fost detectate rezultate DMARC care necesită verificare.</p>
+<div style="padding:20px 24px;background:#174f3a;color:#fff"><h1 style="margin:0;font-size:20px">{html.escape(title)}</h1></div>
+<div style="padding:24px"><p style="margin-top:0">{html.escape(opening)}</p>
 <p><strong>Domenii:</strong> {html.escape(', '.join(domains))}<br><strong>Mesaje afectate:</strong> {affected}</p>
 <table style="width:100%;border-collapse:collapse;font-size:13px">
 <thead><tr style="background:#eef5f1"><th style="padding:8px;text-align:left">Domeniu</th><th style="padding:8px;text-align:left">Raportor</th><th style="padding:8px;text-align:left">Report-ID</th><th style="padding:8px;text-align:left">Problemă</th><th style="padding:8px;text-align:right">Mesaje</th></tr></thead>
@@ -481,7 +578,11 @@ def process_scan(
 	notify: str,
 	allowed_source_ips: set[str],
 	dry_run: bool,
+	*, now: datetime | None = None, digest_hour: int = 8, digest_timezone: str = 'UTC',
 ) -> dict[str, object]:
+	now = now or datetime.now(UTC)
+	deferred = [item for item in scan.problems if digest_only(item.report, allowed_source_ips)]
+	immediate = [item for item in scan.problems if item not in deferred]
 	summary: dict[str, object] = {
 		"healthy": len(scan.healthy),
 		"problems": len(scan.problems),
@@ -489,6 +590,9 @@ def process_scan(
 		"invalid": scan.invalid,
 		"alert_sent": False,
 		"dry_run": dry_run,
+		"digest_queued": len(deferred),
+		"immediate_reports": len(immediate),
+		"digest_sent": False,
 	}
 	if dry_run:
 		summary["problem_reports"] = [
@@ -504,13 +608,16 @@ def process_scan(
 	for item in scan.invalid:
 		move_message(mailbox, item["uid"], "Invalid")
 
-	if scan.problems:
-		message = build_alert_message((item.report for item in scan.problems), sender, notify, allowed_source_ips)
-		submit_alert(message)
-		for item in scan.problems:
-			mark_processed(connection, item.report, "alerted")
-			move_message(mailbox, item.uid, "Archive")
-		summary["alert_sent"] = True
+	for item in deferred:
+		queue_digest(connection, item.report, now, digest_hour, digest_timezone)
+		move_message(mailbox, item.uid, 'Archive')
+	if immediate:
+		summary['alert_sent'] = send_once(connection, (item.report for item in immediate), sender, notify, allowed_source_ips, now)
+		if summary['alert_sent']:
+			for item in immediate:
+				move_message(mailbox, item.uid, "Archive")
+	summary['digest_sent'] = flush_digest(connection, sender, notify, allowed_source_ips, now, digest_hour, digest_timezone)
+	summary['uncertain_outbox'] = connection.execute("SELECT count(*) FROM notification_outbox WHERE status='uncertain'").fetchone()[0]
 	return summary
 
 
@@ -550,6 +657,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 	parser.add_argument("--dry-run", action="store_true")
 	parser.add_argument("--self-test", action="store_true")
 	parser.add_argument("--inspect-file", type=Path)
+	parser.add_argument('--digest-hour', type=int, default=int(os.environ.get('DMARC_ALERTS_DIGEST_HOUR', '8')))
+	parser.add_argument('--digest-timezone', default=os.environ.get('DMARC_ALERTS_DIGEST_TZ', 'UTC'))
 	return parser.parse_args(argv)
 
 
@@ -567,15 +676,20 @@ def main(argv: list[str] | None = None) -> int:
 		return 0
 	if args.max_messages < 1:
 		raise SystemExit("--max-messages must be positive")
+	if not 0 <= args.digest_hour <= 23:
+		raise SystemExit('--digest-hour must be 0..23')
+	if args.digest_timezone != 'UTC':
+		ZoneInfo(args.digest_timezone)  # refuse unknown zones before state or message changes
 
 	connection = open_state(args.state_dir)
 	try:
 		scan = scan_mailbox(args.mailbox, allowed_domains, connection, args.max_messages, allowed_source_ips)
-		summary = process_scan(scan, args.mailbox, connection, args.sender, args.notify, allowed_source_ips, args.dry_run)
+		summary = process_scan(scan, args.mailbox, connection, args.sender, args.notify, allowed_source_ips, args.dry_run,
+			digest_hour=args.digest_hour, digest_timezone=args.digest_timezone)
 	finally:
 		connection.close()
 	print(json.dumps(summary, ensure_ascii=True, sort_keys=True))
-	return 0
+	return 1 if summary.get('uncertain_outbox') else 0
 
 
 if __name__ == "__main__":
