@@ -24,10 +24,22 @@ class SemanticStatusChangeTests(unittest.TestCase):
 		degraded = ["print_error", ["SSH Login is not running (port 22)."], {}]
 		self.assertNotEqual(semantic_line_key(healthy), semantic_line_key(degraded))
 
-	def test_error_detail_change_remains_visible(self):
+	def test_package_count_only_and_old_cache_migration_are_quiet(self):
 		before = ["print_error", ["There are 9 software packages that can be updated."], {}]
-		after = ["print_error", ["There are 10 software packages that can be updated."], {}]
+		after = ["print_line", ["There are 10 software packages that can be updated."], {}]
+		self.assertEqual(semantic_line_key(before), semantic_line_key(after))
+
+	def test_unknown_error_detail_change_remains_visible(self):
+		before = ["print_error", ["There are 9 packages with failed security checks."], {}]
+		after = ["print_error", ["There are 10 packages with failed security checks."], {}]
 		self.assertNotEqual(semantic_line_key(before), semantic_line_key(after))
+
+	def test_pending_packages_are_not_healthy_or_held(self):
+		pending = ["print_line", ["There is 1 software package that can be updated."], {}]
+		for other in (["print_ok", ["System software is up to date."], {}],
+			["print_warning", ["1 package update is held by administrator policy."], {}],
+			["print_error", ["There is 1 software package that can be updated. Reboot failed."], {}]):
+			self.assertNotEqual(semantic_line_key(pending), semantic_line_key(other))
 
 
 if __name__ == "__main__":

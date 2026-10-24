@@ -42,3 +42,17 @@ Migration is additive. Retain the SQLite state and archive when restoring the
 previous code; any queued digest or uncertain outbox requires explicit review
 and must not be discarded or silently replayed. Tests use documentation addresses
 and intercepted submission/move operations, including crash and restart cases.
+
+### BP-MIAB-025 — Available package counts
+
+The number of installable packages is maintenance information, not a service
+failure. Render the aggregate as a plain line and normalise only its exact known
+singular/plural wording when comparing daily status. Recognise the old cached
+error form as the same pending-update state: migration must not invent recovery.
+Do not rewrite the existing cache or label pending updates healthy.
+
+Keep package/version lines in the daily diff, including additions and removals.
+Reboot-required errors, held-update warnings, unknown collection results and
+unrecognised errors retain their existing semantics. Exact matching prevents a
+similar-looking security or service error from being swallowed. This change
+does not install packages or change reboot, patching or notification schedules.

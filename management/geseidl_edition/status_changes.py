@@ -9,6 +9,9 @@ from difflib import SequenceMatcher
 _CLOUDFLARE_HOSTING = re.compile(
 	r"^(?P<prefix>gazduit la )(?P<ips>[0-9a-fA-F:., ]+)(?P<suffix> / cloudflare)$"
 )
+_AVAILABLE_PACKAGE_COUNT = re.compile(
+	r"(?:There is 1 software package that can be updated\.|There are [1-9][0-9]* software packages that can be updated\.)"
+)
 
 
 def _sorted_ip_set(text):
@@ -26,6 +29,13 @@ def _sorted_ip_set(text):
 def semantic_line_key(line):
 	"""Return a stable key while preserving warning/error detail changes."""
 	line_type, line_args, line_kwargs = line
+	if (line_type in {"print_line", "print_error"} and len(line_args) == 1
+		and isinstance(line_args[0], str) and not line_kwargs
+		and _AVAILABLE_PACKAGE_COUNT.fullmatch(line_args[0])):
+		# Only this known aggregate is informational. Preserve package/version
+		# lines, held updates and every unrecognised warning/error. Accept the
+		# old error form too, so a cache migration is not a fake recovery.
+		return json.dumps(["software_updates_available", ["pending"], {}], sort_keys=True)
 	if line_type == "print_ok":
 		# A healthy check remains healthy when its wording, translated label,
 		# counters, or exact free-space value changes. A degradation changes the
@@ -103,7 +113,7 @@ def report_software_updates(packages, reboot_needed, output, shell):
 		output.print_error("System updates have been installed and a reboot of the machine is required.")
 	if packages:
 		count = len(packages)
-		output.print_error("There is 1 software package that can be updated." if count == 1 else
+		output.print_line("There is 1 software package that can be updated." if count == 1 else
 			"There are %d software packages that can be updated." % count)
 		for package in packages:
 			output.print_line("{} ({} -> {})".format(package["package"],

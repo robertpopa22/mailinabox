@@ -49,3 +49,4 @@
 
 | BP-MIAB-021 | Retired optional classifiers do not require synthetic recovery | Reporting | [Details](docs/bp/reporting.md#bp-miab-021--retired-classifier-health) |
 | BP-MIAB-024 | Separate source novelty from authentication failure and reserve notifications before dispatch | Reporting | [Details](docs/bp/reporting.md#bp-miab-024--dmarc-digests-and-uncertain-dispatch) |
+| BP-MIAB-025 | Treat available-package counts as maintenance information | Reporting | [Details](docs/bp/reporting.md#bp-miab-025--available-package-counts) |

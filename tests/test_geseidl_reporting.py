@@ -19,6 +19,7 @@ class Output:
 
 def test_fragmented_changes_are_grouped_and_complete():
     before = [('print_error', ['There are 45 software packages that can be updated.'], {}),
+              ('print_line', ['obsolete (1)'], {}),
               ('print_line', ['unchanged (1)'], {}),
               ('print_line', ['tail (1)'], {})]
     after = [('print_error', ['There are 52 software packages that can be updated.'], {}),
@@ -33,8 +34,8 @@ def test_fragmented_changes_are_grouped_and_complete():
     assert len(headings) == 2
     assert 'Previously' in headings[0][1][0] and 'Currently' in headings[1][1][0]
     values = [line[1][0] for line in output.lines]
-    assert all(text in values for text in [before[0][1][0], after[0][1][0],
-               'redis-server (2)', 'libfreetype6 (2)', 'sg3-utils (2)'])
+    assert all(text in values for text in ['obsolete (1)', 'redis-server (2)', 'libfreetype6 (2)', 'sg3-utils (2)'])
+    assert before[0][1][0] not in values and after[0][1][0] not in values
     assert 'unchanged (1)' not in values
 
 
@@ -94,7 +95,25 @@ def test_reboot_and_installable_updates_are_both_visible():
     report_software_updates([{'package': 'a', 'current_version': '1', 'version': '2'}],
                             True, output, lambda *args, **kwargs: '')
     errors = [line[1][0] for line in output.lines if line[0] == 'print_error']
-    assert len(errors) == 2 and 'reboot' in errors[0] and '1 software package' in errors[1]
+    assert len(errors) == 1 and 'reboot' in errors[0]
+    assert ('print_line', ['There is 1 software package that can be updated.'], {}) in output.lines
+    assert not any(line[0] == 'print_ok' for line in output.lines)
+
+
+def test_count_only_churn_is_quiet_but_package_and_warning_changes_are_not():
+    before = [('print_error', ['There are 45 software packages that can be updated.'], {}),
+              ('print_line', ['pkg (1 -> 2)'], {})]
+    after = [('print_line', ['There are 52 software packages that can be updated.'], {}),
+             ('print_line', ['pkg (1 -> 2)'], {})]
+    output = Output()
+    render_category_changes('System', before, after, output)
+    assert output.lines == []
+    for changed in [('print_line', ['pkg (1 -> 3)'], {}),
+                    ('print_error', ['Service is down.'], {}),
+                    ('print_warning', ['Could not determine updates held by administrator policy.'], {})]:
+        output = Output()
+        render_category_changes('System', after, [after[0], changed], output)
+        assert changed in output.lines
 
 
 def test_unknown_hold_status_never_becomes_false_green():
