@@ -8,6 +8,7 @@ from management.geseidl_edition.status_changes import (
     held_apt_updates, parse_apt_updates, probe_outbound_smtp,
     render_category_changes, report_software_updates,
 )
+from management.geseidl_edition.engine import _from_buffer, _to_buffer
 
 
 class Output:
@@ -114,6 +115,51 @@ def test_count_only_churn_is_quiet_but_package_and_warning_changes_are_not():
         output = Output()
         render_category_changes('System', after, [after[0], changed], output)
         assert changed in output.lines
+
+
+def test_legacy_package_error_to_engine_serialized_info_count_is_quiet():
+    previous = _to_buffer(_from_buffer([
+        ('print_error', ['System updates have been installed and a reboot of the machine is required.'], {}),
+        ('print_error', ['There are 55 software packages that can be updated.'], {}),
+        ('print_line', ['stable-pkg (1 -> 2)'], {}),
+    ]))
+    current = _to_buffer(_from_buffer([
+        ('print_error', ['System updates have been installed and a reboot of the machine is required.'], {}),
+        ('print_line', ['There are 58 software packages that can be updated.'], {}),
+        ('print_line', ['stable-pkg (1 -> 2)'], {}),
+    ]))
+    count = current[1]
+    assert count == ('print_line', ('There are 58 software packages that can be updated.',),
+                     {'monospace': False})
+    output = Output()
+    render_category_changes('System', previous, current, output)
+    assert output.lines == []
+
+
+def test_engine_serialized_package_addition_and_health_changes_remain_visible():
+    previous = _to_buffer(_from_buffer([
+        ('print_error', ['There are 55 software packages that can be updated.'], {}),
+        ('print_line', ['stable-pkg (1 -> 2)'], {}),
+        ('print_warning', ['1 package update is held by administrator policy.'], {}),
+        ('print_ok', ['Service is running.'], {}),
+    ]))
+    current = _to_buffer(_from_buffer([
+        ('print_error', ['System updates have been installed and a reboot of the machine is required.'], {}),
+        ('print_line', ['There are 58 software packages that can be updated.'], {}),
+        ('print_line', ['stable-pkg (1 -> 2)'], {}),
+        ('print_line', ['new-pkg (not installed -> 1)'], {}),
+        ('print_warning', ['2 package updates are held by administrator policy.'], {}),
+        ('print_error', ['Service is down.'], {}),
+    ]))
+    output = Output()
+    render_category_changes('System', previous, current, output)
+    values = [line[1][0] for line in output.lines if line[0] != 'add_heading']
+    assert 'There are 55 software packages that can be updated.' not in values
+    assert 'There are 58 software packages that can be updated.' not in values
+    assert 'new-pkg (not installed -> 1)' in values
+    assert '2 package updates are held by administrator policy.' in values
+    assert 'System updates have been installed and a reboot of the machine is required.' in values
+    assert any(line[0] == 'print_error' and line[1][0] == 'Service is down.' for line in output.lines)
 
 
 def test_unknown_hold_status_never_becomes_false_green():

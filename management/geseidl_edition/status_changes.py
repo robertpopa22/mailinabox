@@ -29,8 +29,14 @@ def _sorted_ip_set(text):
 def semantic_line_key(line):
 	"""Return a stable key while preserving warning/error detail changes."""
 	line_type, line_args, line_kwargs = line
+	plain_kwargs = type(line_kwargs) is dict and not line_kwargs
+	serialized_line_kwargs = (
+		line_type == "print_line" and type(line_kwargs) is dict
+		and len(line_kwargs) == 1 and line_kwargs.get("monospace") is False
+	)
 	if (line_type in {"print_line", "print_error"} and len(line_args) == 1
-		and isinstance(line_args[0], str) and not line_kwargs
+		and isinstance(line_args[0], str)
+		and (plain_kwargs or serialized_line_kwargs)
 		and _AVAILABLE_PACKAGE_COUNT.fullmatch(line_args[0])):
 		# Only this known aggregate is informational. Preserve package/version
 		# lines, held updates and every unrecognised warning/error. Accept the

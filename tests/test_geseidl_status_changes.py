@@ -28,6 +28,18 @@ class SemanticStatusChangeTests(unittest.TestCase):
 		before = ["print_error", ["There are 9 software packages that can be updated."], {}]
 		after = ["print_line", ["There are 10 software packages that can be updated."], {}]
 		self.assertEqual(semantic_line_key(before), semantic_line_key(after))
+		serialized = ["print_line", ["There are 10 software packages that can be updated."], {"monospace": False}]
+		self.assertEqual(semantic_line_key(before), semantic_line_key(serialized))
+
+	def test_package_count_rejects_unexpected_serializer_kwargs(self):
+		legacy = ["print_error", ["There are 9 software packages that can be updated."], {}]
+		for kwargs in ({"monospace": True}, {"monospace": 0}, {"monospace": "false"},
+			{"monospace": False, "other": False}, {"other": False}):
+			with self.subTest(kwargs=kwargs):
+				candidate = ["print_line", ["There are 10 software packages that can be updated."], kwargs]
+				self.assertNotEqual(semantic_line_key(legacy), semantic_line_key(candidate))
+		legacy_with_kwargs = ["print_error", legacy[1], {"monospace": False}]
+		self.assertNotEqual(semantic_line_key(legacy), semantic_line_key(legacy_with_kwargs))
 
 	def test_unknown_error_detail_change_remains_visible(self):
 		before = ["print_error", ["There are 9 packages with failed security checks."], {}]

@@ -51,6 +51,11 @@ singular/plural wording when comparing daily status. Recognise the old cached
 error form as the same pending-update state: migration must not invent recovery.
 Do not rewrite the existing cache or label pending updates healthy.
 
+The actual overlay buffer round-trip may serialize that extra line as
+`print_line` with exactly `{"monospace": false}`. Accept this exact boolean
+metadata (not truthy lookalikes or extra options) so cache migration remains
+quiet after serialization too.
+
 Keep package/version lines in the daily diff, including additions and removals.
 Reboot-required errors, held-update warnings, unknown collection results and
 unrecognised errors retain their existing semantics. Exact matching prevents a
