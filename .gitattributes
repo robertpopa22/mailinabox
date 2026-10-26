@@ -27,5 +27,6 @@ tests/brand_guard_cases.lua         text eol=lf
 management/geseidl_edition/**/*.py text eol=lf
 management/geseidl_edition/*.py    text eol=lf
 management/status_checks.py       text eol=lf
+management/utils.py               text eol=lf
 tools/dnssec_checked.py           text eol=lf
 docs/upstream/patches/*.patch      text eol=lf -whitespace

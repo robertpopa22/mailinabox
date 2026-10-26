@@ -29,6 +29,7 @@ def test_overlay_hooks_reapply_ssh_unknown_fix_idempotently(tmp_path):
     assert [module.apply_hook(hook) for hook in hooks] == ["already", "already"]
     assert (tmp_path / "status_checks.py").read_text(encoding="utf-8") == result
     assert "SSH configuration could not be read" in result
+    assert "(sshd configuration dump)" in result
     assert 'service["port"] is not None' in result
 
 
@@ -39,6 +40,7 @@ def test_ssh_unknown_does_not_become_port_none_firewall_advice():
     services_source = ast.get_source_segment(SOURCE, services)
     ufw_source = ast.get_source_segment(SOURCE, ufw)
     assert "SSH configuration could not be read" in services_source
+    assert "(sshd configuration dump)" in services_source
     assert 'service["port"] is not None' in ufw_source
     assert "Port None" not in ufw_source
 
@@ -69,5 +71,6 @@ def test_config_failure_reports_unknown_and_skips_firewall_port_advice():
     assert namespace["run_services_checks"]({}, output, Pool()) is True
     namespace["check_ufw"]({}, output)
     assert any("SSH configuration could not be read" in warning for warning in output.warnings)
+    assert any("(sshd configuration dump)" in warning for warning in output.warnings)
     assert not output.errors
     assert "Firewall is active." in output.ok

@@ -147,10 +147,21 @@ HOOKS = [
 		"file": "status_checks.py",
 		"mode": "after",
 		"anchor": "\tservices = get_services(env)",
-		"signature": "SSH configuration could not be read (sshd -T)",
-		"block": (
+		"signature": "SSH configuration could not be read (sshd configuration dump)",
+		"legacy_signatures": [
+			"if any(service[\"name\"] == \"SSH Login (ssh)\" and service[\"port\"] is None for service in services):",
+			"SSH configuration could not be read (sshd -T)",
+		],
+		"legacy_blocks": [
+			"\t" + MARK_START + "\n"
 			"\tif any(service[\"name\"] == \"SSH Login (ssh)\" and service[\"port\"] is None for service in services):\n"
 			"\t\toutput.print_warning(\"SSH configuration could not be read (sshd -T); SSH port and firewall status are unknown.\")\n"
+			"\t\tall_running = False\n"
+			"\t" + MARK_END
+		],
+		"block": (
+			"\tif any(service[\"name\"] == \"SSH Login (ssh)\" and service[\"port\"] is None for service in services):\n"
+			"\t\toutput.print_warning(\"SSH configuration could not be read (sshd configuration dump); SSH port and firewall status are unknown.\")\n"
 			"\t\tall_running = False\n"
 		),
 		"indent": "\t",
@@ -239,6 +250,22 @@ def apply_hook(hook):
 	if is_applied(hook, text):
 		return "already"
 	lines = text.split("\n")
+	legacy_signatures = hook.get("legacy_signatures", ())
+	if legacy_signatures:
+		for i, line in enumerate(lines):
+			if line.strip() != MARK_START:
+				continue
+			j = i + 1
+			while j < len(lines) and lines[j].strip() != MARK_END:
+				j += 1
+			if j < len(lines):
+				legacy_text = "\n".join(lines[i:j + 1])
+				if any(signature in legacy_text for signature in legacy_signatures):
+					if legacy_text not in hook.get("legacy_blocks", ()):
+						return "legacy-block-modified"
+					lines[i:j + 1] = _wrapped(hook).rstrip("\n").split("\n")
+					_write(path, "\n".join(lines))
+					return "updated"
 	anchor = hook["anchor"]
 	for i, line in enumerate(lines):
 		if line == anchor:
@@ -313,7 +340,10 @@ def cmd_status():
 
 def cmd_apply():
 	for h in HOOKS:
-		print(f"{h['name']}: {apply_hook(h)}")
+		result = apply_hook(h)
+		print(f"{h['name']}: {result}")
+		if result == "legacy-block-modified":
+			raise RuntimeError("Modified legacy hook preserved; deployment stamp not updated.")
 	stamp = write_stamp()
 	print(f"stamp: v{stamp['overlay_version']} fp={stamp['fingerprint'][:12]} @ {stamp['applied_utc']}")
 

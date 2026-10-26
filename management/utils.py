@@ -189,25 +189,62 @@ def get_ssh_port():
 	return None
 
 def get_ssh_config_value(parameter_name):
-	# Returns ssh configuration value for the provided parameter
+	"""Return an effective sshd setting, or None when it cannot be verified.
+
+	`sshd -G` parses and prints the effective configuration without starting the
+	daemon. Older OpenSSH builds may not implement `-G`; only their explicit
+	unknown-option diagnostic permits the compatibility fallback to `-T`.
+	"""
+	import re
 	import subprocess
-	try:
-		output = shell('check_output', ['sshd', '-T'])
-	except FileNotFoundError:
-		# sshd is not installed. That's ok.
-		return None
-	except subprocess.CalledProcessError:
-		# error while calling shell command
+
+	if not isinstance(parameter_name, str) or not re.fullmatch(r"[a-z][a-z0-9]*", parameter_name, re.I):
 		return None
 
-	for line in output.split("\n"):
-		if " " not in line: continue # there's a blank line at the end
-		key, values = line.split(" ", 1)
-		if key == parameter_name:
-			return values # space-delimited if there are multiple values
+	def read_dump(flag):
+		try:
+			code, output = shell('check_output', ['sshd', flag], capture_stderr=True, trap=True)
+		except (OSError, subprocess.CalledProcessError, UnicodeError):
+			return None, None
+		if isinstance(code, bool) or not isinstance(code, int):
+			return None, None
+		return code, output
 
-	# Did not find the parameter!
-	return None
+	def find_value(output):
+		if not isinstance(output, str):
+			return None
+		found = None
+		for line in output.splitlines():
+			if not line:
+				continue
+			key, separator, values = line.partition(" ")
+			if not separator or not re.fullmatch(r"[a-z][a-z0-9]*", key):
+				return None # diagnostics or malformed directive names make the dump untrusted
+			if key.casefold() == parameter_name.casefold():
+				value = values.strip()
+				if found is not None or not value:
+					return None # the requested effective setting must be unique
+				found = value
+		return found
+
+	code, output = read_dump('-G')
+	if code == 0:
+		return find_value(output)
+	if code is None or not isinstance(output, str):
+		return None
+
+	# Do not mistake an invalid sshd_config diagnostic for an unsupported flag.
+	unknown_g = re.search(
+		r"(?im)^\s*(?:sshd:\s*)?(?:unknown|unrecognized|unrecognised|illegal)\s+option\s+--\s*G\.?\s*$",
+		output,
+	)
+	if not unknown_g:
+		return None
+
+	code, output = read_dump('-T')
+	if code != 0:
+		return None
+	return find_value(output)
 
 if __name__ == "__main__":
 	from web_update import get_web_domains

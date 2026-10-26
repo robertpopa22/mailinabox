@@ -83,7 +83,7 @@ def run_services_checks(env, output, pool):
 	fatal = False
 	services = get_services(env)
 	if any(service["name"] == "SSH Login (ssh)" and service["port"] is None for service in services):
-		output.print_warning("SSH configuration could not be read (sshd -T); SSH port and firewall status are unknown.")
+		output.print_warning("SSH configuration could not be read (sshd configuration dump); SSH port and firewall status are unknown.")
 		all_running = False
 	ret = pool.starmap(check_service, ((i, service, env) for i, service in enumerate(services)), chunksize=1)
 	for _i, running, fatal2, output2 in sorted(ret):
