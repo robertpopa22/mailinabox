@@ -83,6 +83,15 @@ Runtime vs provisioning:
 
 ---
 
+## Monitorul DMARC
+
+Rapoartele cu surse IP neconfirmate și aliniere reușită apar în sumarul
+informativ. Alertele imediate disting eșecurile raportate de aliniere și
+măsurile de aplicare a politicii de constatările care cer validare.
+Șabloanele afișează intervalul raportorului și identificatorul de raportare.
+Rezervarea notificărilor și identificatorii tehnici se calculează din aceleași
+date ca înaintea schimbării textului.
+
 ## Zona `status` — comportament
 
 Pagina admin `#system_status` apelează `/system/status` (daemon.py), care rulează

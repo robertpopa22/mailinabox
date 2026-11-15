@@ -412,9 +412,11 @@ def send_once(connection, reports, sender, notify, allowed_source_ips, now, *, d
 	except BaseException:
 		connection.rollback()
 		raise
-	message = build_alert_message(reports, sender, notify, allowed_source_ips, source_digest=bool(digest_day))
+	message = build_alert_message(
+		reports, sender, notify, allowed_source_ips, source_digest=bool(digest_day),
+		observed_at=now, digest_day=digest_day,
+	)
 	if digest_day:
-		message.replace_header('Subject', '[DMARC digest] surse neconfirmate cu aliniere reusita — ' + digest_day)
 		message.replace_header('Message-ID', f"<dmarc-digest-{key[:24]}@{sender.rpartition('@')[2] or 'localhost'}>")
 	try:
 		submit_alert(message)
@@ -469,21 +471,43 @@ def _format_epoch(value: int) -> str:
 
 
 def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str, allowed_source_ips: set[str],
-	*, source_digest: bool = False) -> EmailMessage:
+	*, source_digest: bool = False, observed_at: datetime | None = None, digest_day: str | None = None) -> EmailMessage:
 	reports = tuple(reports)
 	domains = sorted({report.policy_domain for report in reports})
 	affected = sum(report.get_affected_messages(allowed_source_ips) for report in reports)
 	digest = hashlib.sha256("\n".join(sorted(report.report_key for report in reports)).encode()).hexdigest()[:24]
-	opening = ("Surse IP neconfirmate, cu aliniere DMARC reusita; autenticitatea sursei nu este stabilita de acest raport."
-		if source_digest else "Au fost detectate probleme în rapoartele agregate DMARC.")
-	title = 'Digest DMARC — surse neconfirmate' if source_digest else 'Alertă DMARC'
+	observed = (observed_at or datetime.now(UTC)).astimezone(ZoneInfo("Europe/Bucharest"))
+	codes = {code for report in reports for code in report.get_problem_codes(allowed_source_ips)}
+	if source_digest:
+		title = f"Raport informativ — surse neconfirmate cu aliniere reușită, {digest_day or observed.date()}"
+		opening = ("Rapoartele agregate arată aliniere DMARC reușită pentru sursele IP semnalate. "
+			"Stare neconfirmată pentru identitatea surselor.")
+		action = "IT verifică dacă sursele semnalate aparțin expeditorilor autorizați."
+	elif codes & {"dmarc_alignment_failed", "disposition_quarantine", "disposition_reject"}:
+		title = "Incident — eșecuri de autentificare sau măsuri DMARC raportate"
+		opening = ("Rapoartele agregate consemnează aliniere eșuată, carantinare sau respingere "
+			"în intervalele indicate.")
+		action = "IT verifică sursa, alinierea DKIM/SPF și dispoziția observată pentru mesajele semnalate."
+	else:
+		title = "Avertizare — constatări DMARC de verificat"
+		opening = ("Rapoartele agregate semnalează o sursă neconfirmată, o abatere raportată de la "
+			"politică sau o eroare de raportare. Stare neconfirmată pentru constatările care cer validare.")
+		action = "IT verifică sursa, politica publicată și integritatea raportului, după caz."
+	checked = f"Verificare la {observed.isoformat(timespec='seconds')} (Europe/Bucharest)."
+	automated = "Monitorul a centralizat constatările din rapoartele primite. Rapoartele XML rămân în cutia tehnică."
 
 	plain_lines = [
 		opening,
 		"",
-		f"Domenii: {', '.join(domains)}",
-		f"Mesaje afectate: {affected}",
+		checked,
+		automated,
+		action,
 		"",
+		f"Domenii: {', '.join(domains)}",
+		f"Mesaje asociate constatărilor: {affected}",
+		"",
+		"Detalii tehnice",
+		f"Identificator raportare {digest}",
 	]
 	rows: list[str] = []
 	for report in reports:
@@ -504,6 +528,7 @@ def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str
 			f"<td>{html.escape(report.policy_domain)}</td>"
 			f"<td>{html.escape(report.org_name)}</td>"
 			f"<td>{html.escape(report.report_id)}</td>"
+			f"<td>{_format_epoch(report.period_begin)} — {_format_epoch(report.period_end)}</td>"
 			f"<td>{html.escape(', '.join(problem_codes))}</td>"
 			f"<td>{report.get_affected_messages(allowed_source_ips)}</td>"
 			"</tr>"
@@ -520,9 +545,12 @@ def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str
 <div style="max-width:760px;margin:24px auto;background:#fff;border:1px solid #d8e2dc;border-radius:10px;overflow:hidden">
 <div style="padding:20px 24px;background:#174f3a;color:#fff"><h1 style="margin:0;font-size:20px">{html.escape(title)}</h1></div>
 <div style="padding:24px"><p style="margin-top:0">{html.escape(opening)}</p>
-<p><strong>Domenii:</strong> {html.escape(', '.join(domains))}<br><strong>Mesaje afectate:</strong> {affected}</p>
+<p>{html.escape(checked)}<br>{html.escape(automated)}<br>{html.escape(action)}</p>
+<p><strong>Domenii:</strong> {html.escape(', '.join(domains))}<br><strong>Mesaje asociate constatărilor:</strong> {affected}</p>
+<h2 style="font-size:16px">Detalii tehnice</h2>
+<p>Identificator raportare {digest}</p>
 <table style="width:100%;border-collapse:collapse;font-size:13px">
-<thead><tr style="background:#eef5f1"><th style="padding:8px;text-align:left">Domeniu</th><th style="padding:8px;text-align:left">Raportor</th><th style="padding:8px;text-align:left">Report-ID</th><th style="padding:8px;text-align:left">Problemă</th><th style="padding:8px;text-align:right">Mesaje</th></tr></thead>
+<thead><tr style="background:#eef5f1"><th style="padding:8px;text-align:left">Domeniu</th><th style="padding:8px;text-align:left">Raportor</th><th style="padding:8px;text-align:left">Report-ID</th><th style="padding:8px;text-align:left">Interval</th><th style="padding:8px;text-align:left">Constatare</th><th style="padding:8px;text-align:right">Mesaje</th></tr></thead>
 <tbody>{''.join(rows)}</tbody></table>
 <p style="margin-bottom:0;margin-top:20px;color:#52606d;font-size:12px">Rezumat automat; conținutul mesajelor nu este inclus. XML-urile originale rămân în mailboxul tehnic.</p>
 </div></div></body></html>"""
@@ -530,7 +558,7 @@ def build_alert_message(reports: Iterable[DmarcReport], sender: str, notify: str
 	message = EmailMessage(policy=policy.SMTP)
 	message["From"] = formataddr(("Geseidl DMARC Monitor", sender))
 	message["To"] = notify
-	message["Subject"] = f"[ALERTĂ DMARC] {affected} mesaje afectate — {', '.join(domains)}"
+	message["Subject"] = f"[Autentificare e-mail DMARC] {title}"
 	message["Date"] = format_datetime(datetime.now(UTC))
 	message["Message-ID"] = f"<dmarc-alert-{digest}@{sender.rpartition('@')[2] or 'localhost'}>"
 	message["Auto-Submitted"] = "auto-generated"

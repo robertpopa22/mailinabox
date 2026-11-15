@@ -43,7 +43,18 @@ class DmarcAlertsTest(unittest.TestCase):
 				submit.assert_not_called()
 				result = self.process(connection, now=datetime(2026, 1, 2, 8, 1, tzinfo=UTC))
 				self.assertTrue(result['digest_sent'])
-				self.assertIn('DMARC digest', submit.call_args.args[0]['Subject'])
+				message = submit.call_args.args[0]
+				self.assertEqual(str(message['Subject']),
+					'[Autentificare e-mail DMARC] Raport informativ — surse neconfirmate cu aliniere reușită, 2026-01-02')
+				self.assertEqual(message['X-Geseidl-Status'], 'WARN')
+				self.assertEqual(message['X-Geseidl-Source'], 'dmarc-aggregate')
+				key = connection.execute('SELECT batch_key FROM digest_days').fetchone()[0]
+				self.assertEqual(str(message['Message-ID']), f'<dmarc-digest-{key[:24]}@example.com>')
+				for kind in ('plain', 'html'):
+					body = message.get_body(preferencelist=(kind,)).get_content()
+					self.assertIn('2026-01-02T10:01:00+02:00', body)
+					self.assertIn('Stare neconfirmată pentru identitatea surselor', body)
+					self.assertIn('Detalii tehnice', body)
 				self.process(connection, now=datetime(2026, 1, 2, 8, 16, tzinfo=UTC))
 				submit.assert_called_once()
 			connection.close()
@@ -61,6 +72,11 @@ class DmarcAlertsTest(unittest.TestCase):
 					self.assertTrue(result['alert_sent'])
 					self.assertEqual(result['digest_queued'], 0)
 					submit.assert_called_once()
+					message = submit.call_args.args[0]
+					codes = report.get_problem_codes({'192.0.2.99'})
+					kind = 'Incident' if {'disposition_quarantine', 'dmarc_alignment_failed'} & set(codes) else 'Avertizare'
+					self.assertTrue(str(message['Subject']).startswith(f'[Autentificare e-mail DMARC] {kind} — '))
+					self.assertEqual(message['X-Geseidl-Status'], 'WARN')
 				connection.close()
 
 	def test_mixed_report_and_unknown_disposition_cannot_enter_digest(self):
