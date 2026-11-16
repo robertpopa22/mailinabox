@@ -1,6 +1,5 @@
 # mailinabox — Fork Mail-in-a-Box (geseidl-edition)
 
-> **Modul de lucru cu modele (Geseidl, 06.10.2026):** modelele mari (ex. Fable, Astra; Opus/Sol unde e justificat) fac analiza, coordonarea, deciziile de arhitectură și contraopiniile; execuția (implementare mecanică, migrări, verificări repetabile) merge pe modele mici (Sonnet, Luna, Haiku), cu Opus/Sol doar la pașii care cer judecată grea. Nimic fix: la fiecare task și pas se estimează complexitatea, riscul și necesarul de verificare și se aleg modelul și efortul — nu se moștenește implicit modelul sesiunii.
 
 ## ⭐ DECIZIE DE BAZĂ — FORK SUVERAN (2026-06-09)
 
