@@ -46,6 +46,7 @@ MIAB-03, MIAB-05, MIAB-07.
 
 Primary references reviewed 2026-10-07:
 - [Roundcube 1.7.7](https://github.com/roundcube/roundcubemail/releases/tag/1.7.7)
+- [RCMCardDAV 5.1.5](https://github.com/mstilkerich/rcmcarddav/releases/tag/v5.1.5) (security: VCard photo URIs are no longer fetched by default)
 - [Z-Push 2.7.7](https://github.com/Z-Hub/Z-Push/releases/tag/2.7.7) (CalDAV/CardDAV on `127.0.0.1`, so the new DAV certificate check stays off by design)
 - [Nextcloud 35 requirements](https://docs.nextcloud.com/server/stable/admin_manual/installation/system_requirements.html)
 - [Upstream user_external 4.0.0](https://github.com/nextcloud/user_external/tree/v4.0.0)
