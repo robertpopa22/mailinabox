@@ -15,5 +15,6 @@ def test_frozen_ppa_is_only_a_bootstrap_for_the_sury_repository():
 
 def test_sury_key_is_pinned_and_the_ppa_is_removed():
     assert f'SURY_KEY_FPR={SURY_KEY_FPR}' in SYSTEM
-    assert 'deb.sury.org-php.gpg' in SYSTEM and 'exit 1' in SYSTEM
+    assert 'Signed-By' in SYSTEM and 'gpg --show-keys --with-colons "$SURY_KEYRING"' in SYSTEM and 'exit 1' in SYSTEM
+    assert 'deb.sury.org-php.gpg' not in SYSTEM
     assert 'rm -f /etc/apt/sources.list.d/ondrej-ubuntu-php-*.sources' in SYSTEM

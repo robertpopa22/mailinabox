@@ -120,7 +120,10 @@ if ! dpkg -s debsuryorg-repository-php >/dev/null 2>&1; then
 	apt_install debsuryorg-repository-php
 fi
 command -v gpg >/dev/null || apt_install gpg
-if ! gpg --show-keys --with-colons /usr/share/keyrings/deb.sury.org-php.gpg 2>/dev/null | grep -q "^fpr:.*:$SURY_KEY_FPR:"; then
+# Check the keyring apt actually uses for the sury source (Signed-By), not a sibling file.
+SURY_SOURCE=$(dpkg -L debsuryorg-repository-php | grep -E '^/etc/apt/sources\.list\.d/.+\.(sources|list)$' | head -1)
+SURY_KEYRING=$(sed -n -e 's/^Signed-By:[[:space:]]*//p' -e 's/.*signed-by=\([^] ]*\).*/\1/p' "$SURY_SOURCE" 2>/dev/null | head -1)
+if [ -z "$SURY_KEYRING" ] || ! gpg --show-keys --with-colons "$SURY_KEYRING" 2>/dev/null | grep -q "^fpr:.*:$SURY_KEY_FPR:"; then
 	echo "deb.sury.org PHP key fingerprint mismatch; refusing to continue." >&2
 	exit 1
 fi
