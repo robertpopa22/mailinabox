@@ -51,3 +51,4 @@
 | BP-MIAB-024 | Separate source novelty from authentication failure and reserve notifications before dispatch | Reporting | [Details](docs/bp/reporting.md#bp-miab-024--dmarc-digests-and-uncertain-dispatch) |
 | BP-MIAB-025 | Treat available-package counts as maintenance information | Reporting | [Details](docs/bp/reporting.md#bp-miab-025--available-package-counts) |
 | BP-MIAB-026 | Read effective SSH configuration without requiring daemon runtime state | Security/status | [Details](docs/bp/ssh-config.md#bp-miab-026--read-effective-ssh-configuration-without-requiring-daemon-runtime-state) |
+| BP-MIAB-027 | Schema-qualify functions used by generated columns | PostgreSQL | [Details](docs/bp/postgres.md#bp-miab-027--schema-qualify-functions-used-by-generated-columns) |

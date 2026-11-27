@@ -1,5 +1,5 @@
-# Mail server PostgreSQL 16 tuning — 46GB RAM / 56 cores
-# Append/override in /etc/postgresql/16/main/postgresql.conf
+# Mail server PostgreSQL 19 tuning — 46GB RAM / 56 cores
+# Installed as /etc/postgresql/19/main/conf.d/99-mailinabox-tuned.conf
 
 # Network
 listen_addresses = '<server-lan-ip>, 127.0.0.1'   # replace <server-lan-ip> before use
@@ -23,11 +23,13 @@ random_page_cost = 1.1
 effective_io_concurrency = 200
 
 # WAL / checkpoints
-wal_compression = on
+# Rare checkpoints write far fewer full-page images for this index workload.
+# Cost: crash recovery may replay up to max_wal_size of WAL; size the disk for it.
+wal_compression = zstd
 checkpoint_completion_target = 0.9
-checkpoint_timeout = 15min
-max_wal_size = 4GB
-min_wal_size = 512MB
+checkpoint_timeout = 1d
+max_wal_size = 32GB
+min_wal_size = 2GB
 
 # Logging
 log_min_duration_statement = 1000

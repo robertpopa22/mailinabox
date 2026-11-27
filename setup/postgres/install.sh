@@ -1,5 +1,8 @@
 #!/bin/bash
-# Install + configure PostgreSQL 16 for the email index on the mail server.
+# Install + configure PostgreSQL 19 for the email index on the mail server.
+# PostgreSQL 19 comes from the PGDG repository (apt.postgresql.org), not from Ubuntu.
+# Existing cluster on an older major: upgrade it first with pg_upgradecluster
+# (copy conf.d by hand; install postgresql-19-jit when the old -jit package is present).
 # Idempotent — safe to re-run.
 #
 # Steps:
@@ -15,7 +18,7 @@
 
 set -euo pipefail
 
-PG_VERSION=16
+PG_VERSION=19
 PG_CONF_DIR=/etc/postgresql/$PG_VERSION/main
 PG_CONF=$PG_CONF_DIR/postgresql.conf
 PG_HBA=$PG_CONF_DIR/pg_hba.conf
@@ -30,7 +33,7 @@ LAN_CIDR="${LAN_CIDR:?set LAN_CIDR to the client network CIDR}"
 PG_LAN_HOST="${PG_LAN_HOST:-127.0.0.1}"
 
 if ! command -v psql >/dev/null; then
-    echo "ERROR: psql not installed. Install postgresql-$PG_VERSION first." >&2
+    echo "ERROR: psql not installed. Install postgresql-$PG_VERSION (PGDG) first." >&2
     exit 1
 fi
 

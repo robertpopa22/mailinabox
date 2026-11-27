@@ -10,11 +10,13 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- unaccent must be IMMUTABLE for use in a STORED generated column.
 -- Default unaccent() is STABLE; we wrap it in an immutable shim.
+-- Schema-qualify function and dictionary: pg_upgrade and pg_restore run with an
+-- empty search_path, and an unqualified call fails while rebuilding body_tsv.
 CREATE OR REPLACE FUNCTION public.immutable_unaccent(text)
 RETURNS text
 LANGUAGE sql
 IMMUTABLE PARALLEL SAFE STRICT
-AS $$ SELECT unaccent('unaccent'::regdictionary, $1) $$;
+AS $$ SELECT public.unaccent('public.unaccent'::regdictionary, $1) $$;
 
 DO $$
 BEGIN
