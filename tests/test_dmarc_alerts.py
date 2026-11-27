@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 MODULE_PATH = Path(__file__).parents[1] / "setup" / "geseidl_edition" / "zones" / "mail" / "dmarc_alerts.py"
@@ -18,6 +19,14 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
+try:
+	ZoneInfo("Europe/Bucharest")
+	TZDATA_MISSING = False
+except ZoneInfoNotFoundError:
+	TZDATA_MISSING = True
+
+
+@unittest.skipIf(TZDATA_MISSING, "IANA tz database not installed (Windows without tzdata); production runs on Linux")
 class DmarcAlertsTest(unittest.TestCase):
 	def process(self, connection, report=None, now=None, dry_run=False):
 		scan = MODULE.ScanResult(problems=[MODULE.InboxReport(uid='42', report=report)] if report else [])
