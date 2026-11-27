@@ -1,4 +1,4 @@
-# Mail server PostgreSQL 19 tuning — 46GB RAM / 56 cores
+# Mail server PostgreSQL 19 tuning — 45GB RAM / 44 cores
 # Installed as /etc/postgresql/19/main/conf.d/99-mailinabox-tuned.conf
 
 # Network
@@ -6,17 +6,18 @@ listen_addresses = '<server-lan-ip>, 127.0.0.1'   # replace <server-lan-ip> befo
 port = 5432
 
 # Memory
-shared_buffers = 8GB
-effective_cache_size = 24GB
-work_mem = 128MB
-maintenance_work_mem = 2GB
+shared_buffers = 12GB
+effective_cache_size = 32GB
+work_mem = 256MB
+maintenance_work_mem = 4GB
 huge_pages = try
 
 # Parallel
 max_connections = 100
-max_parallel_workers = 24
-max_parallel_workers_per_gather = 6
-max_parallel_maintenance_workers = 4
+max_worker_processes = 44
+max_parallel_workers = 40
+max_parallel_workers_per_gather = 10
+max_parallel_maintenance_workers = 8
 
 # Storage / IO (SSD)
 random_page_cost = 1.1

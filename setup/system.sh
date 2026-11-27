@@ -110,9 +110,21 @@ hide_output add-apt-repository -y universe
 # Install the duplicity PPA.
 hide_output add-apt-repository -y ppa:duplicity-team/duplicity-release-git
 
-# Stock PHP is now 8.1, but we're transitioning through 8.0 because
-# of Nextcloud.
-hide_output add-apt-repository --y ppa:ondrej/php
+# PHP comes from deb.sury.org. ppa:ondrej/php is frozen (no more updates) and
+# only carries the package that enables the new repository. Install that package
+# once through the signed PPA, check the archive key, then drop the PPA.
+SURY_KEY_FPR=15058500A0235D97F5D10063B188E2B695BD4743
+if ! dpkg -s debsuryorg-repository-php >/dev/null 2>&1; then
+	hide_output add-apt-repository -y ppa:ondrej/php
+	hide_output apt-get update --allow-releaseinfo-change
+	apt_install debsuryorg-repository-php
+fi
+command -v gpg >/dev/null || apt_install gpg
+if ! gpg --show-keys --with-colons /usr/share/keyrings/deb.sury.org-php.gpg 2>/dev/null | grep -q "^fpr:.*:$SURY_KEY_FPR:"; then
+	echo "deb.sury.org PHP key fingerprint mismatch; refusing to continue." >&2
+	exit 1
+fi
+rm -f /etc/apt/sources.list.d/ondrej-ubuntu-php-*.sources /etc/apt/sources.list.d/ondrej-ubuntu-php-*.list
 
 # ### Update Packages
 

@@ -1,5 +1,14 @@
 # Application updates
 
+### BP-MIAB-028 — Leave a frozen package source through the vendor's signed path
+
+- Context: `ppa:ondrej/php` became "deprecated" and frozen; PHP updates moved to `packages.sury.org`. `apt-get update` first failed on the Label change, then stayed quiet while PHP received no more updates.
+- Mistake: Accepting the Label change keeps `apt` working, but it does not bring updates back.
+- Cause: A frozen repository is still served and signed, so nothing fails visibly.
+- Correct: Install the vendor's `debsuryorg-repository-php` package from the still-signed PPA once. Check the new archive key against a pinned fingerprint, then remove the PPA files. A fingerprint mismatch stops setup.
+- Proof: `tests/test_php_source.py` keeps the PPA inside the one-time bootstrap only and checks the pinned key and the PPA removal.
+- Directive: MIAB-11.
+
 ### BP-MIAB-021 — Keep the distribution package and contain its verification role
 - Context: Ubuntu's current OpenDKIM package has new CVEs still under evaluation; Rspamd already verifies incoming DKIM.
 - Mistake: treating a current distribution candidate as proof that every disclosed issue is patched, or assuming signing mode alone skips received signature tags.
