@@ -45,7 +45,7 @@ Validate fingerprints and real authentication after the update. Directive:
 MIAB-03, MIAB-05, MIAB-07.
 
 Primary references reviewed 2026-10-07:
-- [Roundcube 1.7.4](https://github.com/roundcube/roundcubemail/releases/tag/1.7.4)
+- [Roundcube 1.7.7](https://github.com/roundcube/roundcubemail/releases/tag/1.7.7)
 - [Nextcloud 35 requirements](https://docs.nextcloud.com/server/stable/admin_manual/installation/system_requirements.html)
 - [Upstream user_external 4.0.0](https://github.com/nextcloud/user_external/tree/v4.0.0)
 
