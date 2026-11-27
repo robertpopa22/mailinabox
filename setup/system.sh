@@ -121,9 +121,12 @@ if ! dpkg -s debsuryorg-repository-php >/dev/null 2>&1; then
 fi
 command -v gpg >/dev/null || apt_install gpg
 # Check the keyring apt actually uses for the sury source (Signed-By), not a sibling file.
-SURY_SOURCE=$(dpkg -L debsuryorg-repository-php | grep -E '^/etc/apt/sources\.list\.d/.+\.(sources|list)$' | head -1)
-SURY_KEYRING=$(sed -n -e 's/^Signed-By:[[:space:]]*//p' -e 's/.*signed-by=\([^] ]*\).*/\1/p' "$SURY_SOURCE" 2>/dev/null | head -1)
-if [ -z "$SURY_KEYRING" ] || ! gpg --show-keys --with-colons "$SURY_KEYRING" 2>/dev/null | grep -q "^fpr:.*:$SURY_KEY_FPR:"; then
+# debsuryorg-repository-php writes this source from its postinst (php.list is the legacy name).
+SURY_KEYRING=$(sed -n -e 's/^Signed-By:[[:space:]]*//p' -e 's/.*signed-by=\([^] ]*\).*/\1/p' \
+	/etc/apt/sources.list.d/php.sources /etc/apt/sources.list.d/php.list 2>/dev/null | sed -n 1p || true)
+# Capture first: under pipefail, gpg | grep -q can fail by SIGPIPE even on a match.
+SURY_FPRS=$( { [ -n "$SURY_KEYRING" ] && gpg --show-keys --with-colons "$SURY_KEYRING" 2>/dev/null; } || true)
+if ! grep -q "^fpr:.*:$SURY_KEY_FPR:" <<<"$SURY_FPRS"; then
 	echo "deb.sury.org PHP key fingerprint mismatch; refusing to continue." >&2
 	exit 1
 fi
