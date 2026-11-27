@@ -36,12 +36,12 @@ nextcloud_hash=5bf2871443fb90a83aa720ab3754ce31a9082f63
 # the error message when it doesn't match what is below:
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/contacts
-contacts_ver=8.9.1
-contacts_hash=ec22abf78e5caf796b326c4838b1162d29970a9e
+contacts_ver=8.10.0
+contacts_hash=0d934ad91b970a2370e404b6d409c2baa52a2a19
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/calendar
-calendar_ver=6.6.2
-calendar_hash=f396ede3d50b15e4975319de7cae58b035f30b4c
+calendar_ver=6.7.0
+calendar_hash=69ff9907d3e016287075e45601992cf2f762f98d
 
 # Always ensure the versions are supported, see https://apps.nextcloud.com/apps/user_external
 user_external_ver=4.0.0
@@ -204,7 +204,12 @@ fi
 
 # If the Nextcloud directory is missing (never been installed before, or the nextcloud version to be installed is different
 # from the version currently installed, do the install/upgrade
-if [ ! -d /usr/local/lib/owncloud/ ] || [[ ! ${CURRENT_NEXTCLOUD_VER} =~ ^$nextcloud_ver ]]; then
+# >>> GESEIDL EDITION OVERLAY >>>
+# Pinned contacts/calendar releases must reach the server even when the Nextcloud version is unchanged.
+installed_app_ver() { sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' "/usr/local/lib/owncloud/apps/$1/appinfo/info.xml" 2>/dev/null | head -1; }
+# <<< GESEIDL EDITION OVERLAY <<<
+if [ ! -d /usr/local/lib/owncloud/ ] || [[ ! ${CURRENT_NEXTCLOUD_VER} =~ ^$nextcloud_ver ]] \
+	|| [ "$(installed_app_ver contacts)" != "$contacts_ver" ] || [ "$(installed_app_ver calendar)" != "$calendar_ver" ]; then
 
 	# Stop php-fpm if running. If they are not running (which happens on a previously failed install), dont bail.
 	service php"$PHP_VER"-fpm stop &> /dev/null || /bin/true
